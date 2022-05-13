@@ -2,7 +2,7 @@
 # Azure AppGW - An Adaptable Application Driver for Venafi
 #
 # Template Driver Version: 202006081054
-$Script:AdaptableAppVer = "202202021917"
+$Script:AdaptableAppVer = "202205131648"
 $Script:AdaptableAppDrv = "Azure AppGW"
 
 <#
@@ -206,15 +206,16 @@ function Install-Certificate
             Write-VenDebugLog "\\-- Subject $($Cert.Subject)"
             Write-VenDebugLog "\\-- Serial Number $($Cert.SerialNumber)"
             Write-VenDebugLog "\\-- Thumbprint $($Cert.Thumbprint)"
-            $NewCert = $Cert
         }
-    } catch {
+    }
+    catch {
         throw "$($LocalHost): Invalid certificate: ($($_))"
     }
 
     try {
         [IO.File]::WriteAllBytes($TempPfxFile.FullName,$Specific.Pkcs12)
-    } catch {
+    }
+    catch {
         throw "$($LocalHost): Certificate export failed: ($($_))"
     }
 
@@ -224,7 +225,7 @@ function Install-Certificate
         $i=0
         do {
             $AzContext = Set-AzContext -Subscription $SubscriptionID -Scope Process
-            if ($AzContext -eq $null) {
+            if ($null -eq $AzContext) {
                 if ($i -ge 5) {
                     throw "AzContext is NULL"
                 } else {
@@ -234,8 +235,9 @@ function Install-Certificate
                     Start-Sleep -Seconds $wait
                 }
             }
-        } while ($AzContext -eq $null)
-    } catch {
+        } while ($null -eq $AzContext)
+    }
+    catch {
         Write-VenDebugLog "Connect-Ven2AzGateway call failed - $($_)"
         throw $_
     }
@@ -243,8 +245,8 @@ function Install-Certificate
     # retrieve application gateway
     try {
         $AppGateway = Get-Ven2AzApplicationGateway -Name $AppGwName -ResourceGroupName $ResourceGroup -DefaultProfile $AzContext
-#Write-Output $AppGateway.SslCertificates >> $Script:V2Afile
-    } catch {
+    }
+    catch {
         Write-VenDebugLog "Get-Ven2AzApplicationGateway has failed - $($_)"
         throw $_
     }
@@ -252,16 +254,17 @@ function Install-Certificate
     try {
         # check to see if certificate is already defined
         $AzSslCert = Get-AzApplicationGatewaySslCertificate -Name $General.AssetName -ApplicationGateway $AppGateway -DefaultProfile $AzContext
-        if ($AzSslCert -eq $null) {
+        if ($null -eq $AzSslCert) {
             # doesn't exist - need to upload the certificate
             Write-VenDebugLog "SSL Certificate entry $($General.AssetName) not found - attempting upload"
             $PfxPW = ConvertTo-SecureString $Specific.EncryptPass -AsPlainText -Force
             $AppGateway = Add-AzApplicationGatewaySslCertificate -ApplicationGateway $AppGateway -Name $General.AssetName -CertificateFile $TempPfxFile.FullName -Password $PfxPW -DefaultProfile $AzContext
             $AzSslCert = Get-AzApplicationGatewaySslCertificate -Name $General.AssetName -ApplicationGateway $AppGateway -DefaultProfile $AzContext
-            if ($AzSslCert -eq $null) {
+            if ($null -eq $AzSslCert) {
                 throw "Can't find uploaded cert"
             }
-        } else {
+        }
+        else {
             # certificate has already been uploaded to the application gateway
             Write-VenDebugLog "SSL certificate $($AzSslCert.Name) is already installed"
             Convert-Bytes2X509 $AzSslCert.PublicCertData
@@ -272,17 +275,19 @@ function Install-Certificate
             Write-VenDebugLog "Certificate Already Exists - Returning control to Venafi TPP"
             return @{ Result="AlreadyInstalled"; }
         }
-    } catch {
+    }
+    catch {
         throw "Error looking for existing cert - $($_)"
     }
 
     # save new certificate to application gateway configuration
     try {
         $AppGateway = Set-AzApplicationGateway -ApplicationGateway $AppGateway -DefaultProfile $AzContext #-Verbose *>> $Script:V2Afile
-        if ($AppGateway -eq $null) {
+        if ($null -eq $AppGateway) {
             throw "Updated AGW is NULL"
         }
-    } catch {
+    }
+    catch {
         throw "$($LocalHost): Set-AzApplicationGateway failed - $($_)"
     }
 
@@ -327,9 +332,6 @@ function Activate-Certificate
     
     Initialize-VenDebugLog -AppGW $AppGwName -Listener $ListenerName
 
-#    Write-Output "`nGeneral Hashtable`n" >> $Script:V2Afile
-#    Write-Output $General >> $Script:V2Afile
-
     Write-VenDebugLog "Tenant ID:           [$($TenantID)]"
     Write-VenDebugLog "Subscription ID:     [$($SubscriptionID)]"
     Write-VenDebugLog "Resource Group:      [$($ResourceGroup)]"
@@ -345,7 +347,7 @@ function Activate-Certificate
         $i=0
         do {
             $AzContext = Set-AzContext -Subscription $SubscriptionID -Scope Process
-            if ($AzContext -eq $null) {
+            if ($null -eq $AzContext) {
                 if ($i -ge 5) {
                     throw "AzContext is NULL"
                 } else {
@@ -355,8 +357,9 @@ function Activate-Certificate
                     Start-Sleep -Seconds $wait
                 }
             }
-        } while ($AzContext -eq $null)
-    } catch {
+        } while ($null -eq $AzContext)
+    }
+    catch {
         Write-VenDebugLog "Connect-Ven2AzGateway call failed - $($_)"
         throw $_
     }
@@ -364,8 +367,8 @@ function Activate-Certificate
     # retrieve application gateway
     try {
         $AppGateway = Get-Ven2AzApplicationGateway -Name $AppGwName -ResourceGroupName $ResourceGroup -DefaultProfile $AzContext
-#Write-Output $AppGateway.SslCertificates >> $Script:V2Afile
-    } catch {
+    }
+    catch {
         Write-VenDebugLog "Get-Ven2AzApplicationGateway has failed - $($_)"
         throw $_
     }
@@ -375,8 +378,8 @@ function Activate-Certificate
         $Listener = Get-AzApplicationGatewayHttpListener -Name $ListenerName -ApplicationGateway $AppGateway -DefaultProfile $AzContext
         Write-VenDebugLog "Found Listener: $($ListenerName)"
         Write-VenDebugLog "\\-- $($Listener.Id)"
-#Write-Output $Listener >> $Script:V2Afile
-    } catch {
+    }
+    catch {
         Write-VenDebugLog "Get-AzApplicationGatewayHttpListener has failed - $($_)"
         throw "$($LocalHost): Get-AzApplicationGatewayHttpListener has failed - $($_)"
     }
@@ -386,8 +389,8 @@ function Activate-Certificate
         $AzCertificate = Get-AzApplicationGatewaySslCertificate -Name $CertName -ApplicationGateway $AppGateway -DefaultProfile $AzContext
         Write-VenDebugLog "Found SSL Certificate: $($CertName)"
         Write-VenDebugLog "\\-- $($AzCertificate.Id)"
-#Write-Output $AzCertificate >> $Script:V2Afile
-    } catch {
+    }
+    catch {
         Write-VenDebugLog "Get-AzApplicationGatewaySslCertificate has failed - $($_)"
         throw "$($LocalHost): Get-AzApplicationGatewaySslCertificate has failed - $($_)"
     }
@@ -405,28 +408,29 @@ function Activate-Certificate
             RequireServerNameIndication = $Listener.RequireServerNameIndication
             Protocol = $Listener.Protocol
         }
-        if ($Listener.FirewallPolicy -ne $null) {
+        if ($null -ne $Listener.FirewallPolicy) {
             $ListenerHash.Add('FirewallPolicyId',$Listener.FirewallPolicy.Id)
         }
-        if ($Listener.HostName -ne $null) {
+        if ($null -ne $Listener.HostName) {
             $ListenerHash.Add('HostName',$Listener.HostName)
         }
-        if ($Listener.HostNames -ne $null) {
+        if ($null -ne $Listener.HostNames) {
             $ListenerHash.Add('HostNames',$Listener.HostNames)
         }
-        if ($Listener.CustomErrorConfigurations -ne $null) {
+        if ($null -ne $Listener.CustomErrorConfigurations) {
             $ListenerHash.Add('CustomErrorConfiguration',$Listener.CustomErrorConfigurations)
         }
         $AppGateway = Set-AzApplicationGatewayHttpListener -ApplicationGateway $AppGateway @ListenerHash -DefaultProfile $AzContext
-#Write-Output $AppGateway.HttpListeners >> $Script:V2Afile
-    } catch {
+    }
+    catch {
         Write-VenDebugLog "Set-AzApplicationGatewayHttpListener has failed - $($_)"
         throw "$($LocalHost): Set-AzApplicationGatewayHttpListener has failed - $($_)"
     }
 
     try {
         $AppGateway = Set-AzApplicationGateway -ApplicationGateway $AppGateway -DefaultProfile $AzContext
-    } catch {
+    }
+    catch {
         Write-VenDebugLog "Set-AzApplicationGateway has failed - $($_)"
         throw "$($LocalHost): Set-AzApplicationGateway has failed - $($_)"
     }
@@ -471,18 +475,20 @@ function Extract-Certificate
         $i=0
         do {
             $AzContext = Set-AzContext -Subscription $SubscriptionID -Scope Process
-            if ($AzContext -eq $null) {
+            if ($null -eq $AzContext) {
                 if ($i -ge 5) {
                     throw "AzContext is NULL"
-                } else {
+                }
+                else {
                     $i++
                     $wait = Get-Random -Minimum ($i+1) -Maximum ($i*3)
                     Write-VenDebugLog "...miss on AzContext Sub:$($AzContext.Subscription) (#$($i)) - sleeping for $($wait) seconds"
                     Start-Sleep -Seconds $wait
                 }
             }
-        } while ($AzContext -eq $null)
-    } catch {
+        } while ($null -eq $AzContext)
+    }
+    catch {
         Write-VenDebugLog "Connect-Ven2AzGateway call failed - $($_)"
         throw $_
     }
@@ -490,7 +496,8 @@ function Extract-Certificate
     # retrieve application gateway
     try {
         $AppGateway = Get-Ven2AzApplicationGateway -Name $AppGwName -ResourceGroupName $ResourceGroup -DefaultProfile $AzContext
-    } catch {
+    }
+    catch {
         Write-VenDebugLog "Get-Ven2AzApplicationGateway has failed - $($_)"
         throw $_
     }
@@ -500,7 +507,8 @@ function Extract-Certificate
         $Listener = Get-AzApplicationGatewayHttpListener -Name $ListenerName -ApplicationGateway $AppGateway -DefaultProfile $AzContext
         Write-VenDebugLog "Found Listener: $($Listener.Name)"
         Write-VenDebugLog "\\-- $($Listener.Id)"
-    } catch {
+    }
+    catch {
         Write-VenDebugLog "Get-AzApplicationGatewayHttpListener call failed - $($_)"
         throw $_
     }
@@ -510,7 +518,8 @@ function Extract-Certificate
     Write-VenDebugLog "\\-- $($Listener.SslCertificate.Id)"
     try {
         $Cert = Get-Ven2AzCertById -CertificateId $Listener.SslCertificate.Id -ApplicationGateway $AppGateway
-    } catch {
+    }
+    catch {
         Write-VenDebugLog "SSL certificate not found for Listener $($ListenerName)"
         throw "SSL certificate not found for Listener $($ListenerName)"
     }
@@ -568,18 +577,20 @@ function Discover-Certificates
         $i=0
         do {
             $AzContext = Set-AzContext -Subscription $SubscriptionID -Scope Process
-            if ($AzContext -eq $null) {
+            if ($null -eq $AzContext) {
                 if ($i -ge 5) {
                     throw "AzContext is NULL"
-                } else {
+                }
+                else {
                     $i++
                     $wait = Get-Random -Minimum ($i+1) -Maximum ($i*3)
                     Write-VenDebugLog "...miss on AzContext Sub:$($AzContext.Subscription) (#$($i)) - sleeping for $($wait) seconds"
                     Start-Sleep -Seconds $wait
                 }
             }
-        } while ($AzContext -eq $null)
-    } catch {
+        } while ($null -eq $AzContext)
+    }
+    catch {
         Write-VenDebugLog "Connect-Ven2AzGateway call failed - $($_)"
         throw $_
     }
@@ -587,7 +598,8 @@ function Discover-Certificates
     # retrieve application gateway
     try {
         $AppGateway = Get-Ven2AzApplicationGateway -Name $AppGwName -ResourceGroupName $ResourceGroup -DefaultProfile $AzContext
-    } catch {
+    }
+    catch {
         Write-VenDebugLog "Get-Ven2AzApplicationGateway has failed - $($_)"
         throw $_
     }
@@ -619,11 +631,13 @@ function Discover-Certificates
                         }
                     }
                     $ApplicationList += $anApp
-                } catch {
+                }
+                catch {
                     Write-VenDebugLog "Listener [$($aListener.Name)] has no certificate - ignored"
                 }
             }
-        } else {
+        }
+        else {
             Write-VenDebugLog "Listener [$($aListener.Name)] is unencrypted - ignored"
         }
     }
@@ -685,7 +699,8 @@ function Connect-Ven2Azure
     # connect to the Azure account
     try {
         $SpProfile = Connect-AzAccount -Credential $AzCredential -Subscription $SubscriptionId -TenantId $TenantId -ServicePrincipal -SkipContextPopulation
-    } catch {
+    }
+    catch {
         Write-VenDebugLog "Connect-AzAccount has failed - $($_)"
         throw $_
     }
@@ -715,7 +730,8 @@ Function Convert-Bytes2X509
         # Only 1 certificate so use that one
         $ServerAt=0
         $CertOrder += $ServerAt
-    } else {
+    }
+    else {
         # find the self-signed root certificate first
         $i=0
         foreach ($aCert in $P7B.Certificates) {
@@ -747,7 +763,8 @@ Function Convert-Bytes2X509
                     if ($CertOrder.Count -lt $P7B.Certificates.Count) {
                         # this is a chain cert
                         $CertType='CHAIN'
-                    } else {
+                    }
+                    else {
                         # this is the server cert
                         $ServerAt=$i
                         $CertType='SERVER'
@@ -789,7 +806,8 @@ Function Convert-Bytes2X509
             PEM    = $FormattedPem
             RawPEM = $RawPEM
         }
-    } else {
+    }
+    else {
         $RootResults = $null
     }
 
@@ -871,7 +889,8 @@ function Get-Ven2AzCertById
             try {
                 $Cert = Convert-Bytes2X509 -ByteString $aCert.PublicCertData
                 return $Cert
-            } catch {
+            }
+            catch {
                 throw $_
             }
         }
@@ -897,20 +916,22 @@ function Get-Ven2AzApplicationGateway
         $i=0
         do {
             $AppGateway = Get-AzApplicationGateway -Name $Name -ResourceGroupName $ResourceGroupName -DefaultProfile $DefaultProfile
-            if ($AppGateway -eq $null) {
+            if ($null -eq $AppGateway) {
                 if ($i -ge $maxRetries) {
-                    throw "AppGateway is NULL"
-                } else {
+                    throw "AppGateway is NULL ($($maxRetries) attempts)"
+                }
+                else {
                     $i++
                     $wait = Get-Random -Minimum ($i+1) -Maximum ($i*3)
                     Write-VenDebugLog "...miss on $($AppGwName) Sub:$($AzContext.Subscription) (#$($i)) - sleeping for $($wait) seconds"
                     Start-Sleep -Seconds $wait
                 }
             }
-        } while ($AppGateway -eq $null)
+        } while ($null -eq $AppGateway)
         Write-VenDebugLog "Found Application Gateway: $($AppGateway.Name)"
         Write-VenDebugLog "\\-- $($AppGateway.Id)"
-    } catch {
+    }
+    catch {
         Write-VenDebugLog "Get-AzApplicationGateway has failed - $($_)"
         throw $_
     }
@@ -921,22 +942,25 @@ function Get-Ven2AzApplicationGateway
 # Otherwise do nothing and return nothing
 function Write-VenDebugLog
 {
-    Param( [Parameter(Position=0, Mandatory)][string]$LogMessage )
+    Param(
+        [Parameter(Position=0, Mandatory)][string]$LogMessage,
+        [switch]$NoFunctionTag
+    )
 
     filter Add-TS {"$(Get-Date -Format o): $_"}
 
-    # do nothing and return immediately if debug isn't on
-    if ($DEBUG_FILE -eq $null) {
-        return
-    }
+    # if the logfile isn't initialized then do nothing and return immediately
+    if ($null -eq $Script:venDebugFile) { return }
     
-    # if the logfile isn't initialized then just crash now
-    if ($Script:venDebugFile -eq $null) {
-        throw("Call to Write-VenDebugLog() but logfile has not been initialized...")
+    if ($NoFunctionTag.IsPresent) {
+        $taggedLog = $LogMessage
+    }
+    else {
+        $taggedLog = "[$((Get-PSCallStack)[1].Command)] $($LogMessage)"
     }
 
     # write the message to the debug file
-    Write-Output "$($LogMessage)" | Add-TS | Add-Content -Path $Script:venDebugFile
+    Write-Output "$($taggedLog)" | Add-TS | Add-Content -Path $Script:venDebugFile
 }
 
 function Initialize-VenDebugLog
@@ -946,15 +970,17 @@ function Initialize-VenDebugLog
         [String]$Listener='ALL'
     )
 
-    if ($Script:venDebugFile -ne $null) {
+    # if the debugfile is already setup we shouldn't be called again - log a warning
+    if ($null -ne $Script:venDebugFile) {
         Write-VenDebugLog "Called by $((Get-PSCallStack)[1].Command)"
         Write-VenDebugLog 'WARNING: Initialize-VenDebugLog() called more than once!'
         return
     }
 
-    if ($DEBUG_FILE -eq $null) {
+    if ($null -eq $DEBUG_FILE) {
         # do nothing and return immediately if debug isn't on
         if ($General.VarBool1 -eq $false) { return }
+
         # pull Venafi base directory from registry for global debug flag
         $logPath = "$((Get-ItemProperty HKLM:\Software\Venafi\Platform).'Base Path')Logs"
     }
@@ -964,12 +990,14 @@ function Initialize-VenDebugLog
     }
 
     $Script:venDebugFile = "$($logPath)\$($Script:AdaptableAppDrv.Replace(' ',''))-$($AppGW)"
-#    $Script:venDebugFile = "$($logPath)\$($Script:AdaptableAppDrv.Replace(' ',''))-$($AppGW)-$($Listener)"
     $Script:venDebugFile += ".log"
     
-    Write-Output "" | Add-Content -Path $Script:venDebugFile
-    Write-VenDebugLog "$($Script:AdaptableAppDrv) v$($Script:AdaptableAppVer): Venafi called $((Get-PSCallStack)[1].Command)"
-    Write-VenDebugLog "PowerShell Environment: $($PSVersionTable.PSEdition) Edition, Version $($PSVersionTable.PSVersion.Major)"
+    Write-Output '' | Add-Content -Path $Script:venDebugFile
+
+    Write-VenDebugLog -NoFunctionTag -LogMessage "$($Script:AdaptableAppDrv) v$($Script:AdaptableAppVer): Venafi called $((Get-PSCallStack)[1].Command)"
+    Write-VenDebugLog -NoFunctionTag -LogMessage "PowerShell Environment: $($PSVersionTable.PSEdition) Edition, Version $($PSVersionTable.PSVersion.Major)"
+
+    Write-VenDebugLog "Called by $((Get-PSCallStack)[1].Command)"
 }
 
 # END OF SCRIPT
