@@ -2,7 +2,7 @@
 # Azure AppGW - An Adaptable Application Driver for Venafi
 #
 # Template Driver Version: 202006081054
-$Script:AdaptableAppVer = "202205161717"
+$Script:AdaptableAppVer = "202205161753"
 $Script:AdaptableAppDrv = "Azure AppGW"
 
 <#
@@ -529,7 +529,6 @@ function Extract-Certificate
 #    Write-VenDebugLog "Certificate Serial Number: $($Cert.X509.SerialNumber)"
 #    Write-VenDebugLog "Certificate Thumbprint:    $($Cert.X509.Thumbprint)"
 
-    Write-VenDebugLog "Disconnecting from Azure API"
     Disconnect-Ven2Azure
 
     Write-VenDebugLog "Certificate Extracted - Returning control to Venafi TPP"
@@ -642,7 +641,6 @@ function Discover-Certificates
         }
     }
 
-    Write-VenDebugLog "Disconnecting from Azure API"
     Disconnect-Ven2Azure
 
     Write-VenDebugLog "Discovered $($ApplicationList.Count) Listeners on Application Gateway $($AppGateway.Name)"
@@ -718,6 +716,7 @@ function Disconnect-Ven2Azure
 {
     Write-VenDebugLog "Called by $((Get-PSCallStack)[1].Command)"
 
+    Write-VenDebugLog "Disconnecting from Azure API"
     Disconnect-AzAccount
 }
 
