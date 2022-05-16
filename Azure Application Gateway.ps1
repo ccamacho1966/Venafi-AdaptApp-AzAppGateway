@@ -2,7 +2,7 @@
 # Azure AppGW - An Adaptable Application Driver for Venafi
 #
 # Template Driver Version: 202006081054
-$Script:AdaptableAppVer = "202205131648"
+$Script:AdaptableAppVer = "202205161717"
 $Script:AdaptableAppDrv = "Azure AppGW"
 
 <#
@@ -147,6 +147,8 @@ function Install-Certificate
         [System.Collections.Hashtable]$Specific
     )
 
+    Initialize-VenDebugLog -General $General
+
     $ListenerName = $General.VarText4.Trim()
     $AzSpPass = $General.UserPass
 
@@ -160,20 +162,13 @@ function Install-Certificate
     $TenantID = $AzUser[1]
     $LocalHost = [Environment]::MachineName
     
-    Initialize-VenDebugLog -AppGW $AppGwName -Listener $ListenerName
-
     Write-VenDebugLog "Tenant ID:           [$($TenantID)]"
     Write-VenDebugLog "Subscription ID:     [$($SubscriptionID)]"
     Write-VenDebugLog "Resource Group:      [$($ResourceGroup)]"
     Write-VenDebugLog "Application Gateway: [$($AppGwName)]"
     Write-VenDebugLog "Listener Name:       [$($ListenerName)]"
-    Write-VenDebugLog "Service Principal:   [$($AzSpName)]"
-    Write-VenDebugLog "Global Debug File:   [$($DEBUG_FILE)]"
-
-#    Write-Output "`nGeneral Hashtable`n" >> $Script:V2Afile
-#    Write-Output $General >> $Script:V2Afile
-#    Write-Output "`nSpecific Hashtable`n" >> $Script:V2Afile
-#    Write-Output $Specific >> $Script:V2Afile
+#    Write-VenDebugLog "Service Principal:   [$($AzSpName)]"
+#    Write-VenDebugLog "Global Debug File:   [$($DEBUG_FILE)]"
 
     try {
         $TempPfxFile = New-TemporaryFile
@@ -182,7 +177,7 @@ function Install-Certificate
     }
 
     Write-VenDebugLog "PFX filename:        [$($TempPfxFile.FullName)]"
-    Write-VenDebugLog "PFX password:        [$($Specific.EncryptPass)]"
+#    Write-VenDebugLog "PFX password:        [$($Specific.EncryptPass)]"
 
 # X509KeyStorageFlags - bitfield
 #
@@ -202,10 +197,11 @@ function Install-Certificate
         $i=0
         foreach ($Cert in $CertGroup) {
             $i++
-            Write-VenDebugLog "Chain Entity #$($i)"
-            Write-VenDebugLog "\\-- Subject $($Cert.Subject)"
-            Write-VenDebugLog "\\-- Serial Number $($Cert.SerialNumber)"
-            Write-VenDebugLog "\\-- Thumbprint $($Cert.Thumbprint)"
+            Write-VenDebugLog "Chain Entity #$($i): $($Cert.GetNameInfo(0,$false))"
+#            Write-VenDebugLog "Chain Entity #$($i)"
+#            Write-VenDebugLog "\\-- Subject $($Cert.Subject)"
+#            Write-VenDebugLog "\\-- Serial Number $($Cert.SerialNumber)"
+#            Write-VenDebugLog "\\-- Thumbprint $($Cert.Thumbprint)"
         }
     }
     catch {
@@ -256,22 +252,25 @@ function Install-Certificate
         $AzSslCert = Get-AzApplicationGatewaySslCertificate -Name $General.AssetName -ApplicationGateway $AppGateway -DefaultProfile $AzContext
         if ($null -eq $AzSslCert) {
             # doesn't exist - need to upload the certificate
-            Write-VenDebugLog "SSL Certificate entry $($General.AssetName) not found - attempting upload"
+            Write-VenDebugLog "Uploading certificate $($General.AssetName) to $($AppGwName)"
             $PfxPW = ConvertTo-SecureString $Specific.EncryptPass -AsPlainText -Force
             $AppGateway = Add-AzApplicationGatewaySslCertificate -ApplicationGateway $AppGateway -Name $General.AssetName -CertificateFile $TempPfxFile.FullName -Password $PfxPW -DefaultProfile $AzContext
             $AzSslCert = Get-AzApplicationGatewaySslCertificate -Name $General.AssetName -ApplicationGateway $AppGateway -DefaultProfile $AzContext
             if ($null -eq $AzSslCert) {
+                Write-VenDebugLog "Newly uploaded certificate not found!"
                 throw "Can't find uploaded cert"
             }
+            Write-VenDebugLog "SSL certificate $($General.AssetName) has been uploaded successfully"
         }
         else {
             # certificate has already been uploaded to the application gateway
             Write-VenDebugLog "SSL certificate $($AzSslCert.Name) is already installed"
-            Convert-Bytes2X509 $AzSslCert.PublicCertData
-            $ExistingCert = Convert-Bytes2X509 -ByteString $AzSslCert.PublicCertData
-            Write-VenDebugLog "\\-- Subject $($ExistingCert.X509.Subject)"
-            Write-VenDebugLog "\\-- Serial Number $($ExistingCert.X509.SerialNumber)"
-            Write-VenDebugLog "\\-- Thumbprint $($ExistingCert.X509.Thumbprint)"
+#            Convert-Bytes2X509 $AzSslCert.PublicCertData
+#            $ExistingCert = Convert-Bytes2X509 -ByteString $AzSslCert.PublicCertData
+#            Write-VenDebugLog "\\-- Subject $($ExistingCert.X509.Subject)"
+#            Write-VenDebugLog "\\-- Serial Number $($ExistingCert.X509.SerialNumber)"
+#            Write-VenDebugLog "\\-- Thumbprint $($ExistingCert.X509.Thumbprint)"
+            # Consider implementing logic to validate correct cert is installed..?
             Write-VenDebugLog "Certificate Already Exists - Returning control to Venafi TPP"
             return @{ Result="AlreadyInstalled"; }
         }
@@ -282,12 +281,15 @@ function Install-Certificate
 
     # save new certificate to application gateway configuration
     try {
+        Write-VenDebugLog "Saving updated configuration for $($AppGwName)"
         $AppGateway = Set-AzApplicationGateway -ApplicationGateway $AppGateway -DefaultProfile $AzContext #-Verbose *>> $Script:V2Afile
         if ($null -eq $AppGateway) {
+            Write-VenDebugLog "Configuration update FAILED! (AGW is NULL)"
             throw "Updated AGW is NULL"
         }
     }
     catch {
+        Write-VenDebugLog "Configuration update FAILED! $($_)"
         throw "$($LocalHost): Set-AzApplicationGateway failed - $($_)"
     }
 
@@ -315,6 +317,8 @@ function Activate-Certificate
         [System.Collections.Hashtable]$General
     )
 
+    Initialize-VenDebugLog -General $General
+
     $ListenerName = $General.VarText4.Trim()
     $AzSpPass = $General.UserPass
 
@@ -330,16 +334,14 @@ function Activate-Certificate
 
     $CertName = $General.AssetName
     
-    Initialize-VenDebugLog -AppGW $AppGwName -Listener $ListenerName
-
     Write-VenDebugLog "Tenant ID:           [$($TenantID)]"
     Write-VenDebugLog "Subscription ID:     [$($SubscriptionID)]"
     Write-VenDebugLog "Resource Group:      [$($ResourceGroup)]"
     Write-VenDebugLog "Application Gateway: [$($AppGwName)]"
     Write-VenDebugLog "Listener Name:       [$($ListenerName)]"
     Write-VenDebugLog "Certificate Name:    [$($CertName)]"
-    Write-VenDebugLog "Service Principal:   [$($AzSpName)]"
-    Write-VenDebugLog "Global Debug File:   [$($DEBUG_FILE)]"
+#    Write-VenDebugLog "Service Principal:   [$($AzSpName)]"
+#    Write-VenDebugLog "Global Debug File:   [$($DEBUG_FILE)]"
 
     # connect to Azure API
     try {
@@ -353,7 +355,7 @@ function Activate-Certificate
                 } else {
                     $i++
                     $wait = Get-Random -Minimum ($i+1) -Maximum ($i*3)
-                    Write-VenDebugLog "...miss on AzContext Sub:$($AzContext.Subscription) (#$($i)) - sleeping for $($wait) seconds"
+                    Write-VenDebugLog "...miss #$($i) on AzContext Sub:$($SubscriptionID) () - sleeping for $($wait) seconds"
                     Start-Sleep -Seconds $wait
                 }
             }
@@ -377,7 +379,7 @@ function Activate-Certificate
     try {
         $Listener = Get-AzApplicationGatewayHttpListener -Name $ListenerName -ApplicationGateway $AppGateway -DefaultProfile $AzContext
         Write-VenDebugLog "Found Listener: $($ListenerName)"
-        Write-VenDebugLog "\\-- $($Listener.Id)"
+#        Write-VenDebugLog "\\-- $($Listener.Id)"
     }
     catch {
         Write-VenDebugLog "Get-AzApplicationGatewayHttpListener has failed - $($_)"
@@ -388,7 +390,7 @@ function Activate-Certificate
     try {
         $AzCertificate = Get-AzApplicationGatewaySslCertificate -Name $CertName -ApplicationGateway $AppGateway -DefaultProfile $AzContext
         Write-VenDebugLog "Found SSL Certificate: $($CertName)"
-        Write-VenDebugLog "\\-- $($AzCertificate.Id)"
+#        Write-VenDebugLog "\\-- $($AzCertificate.Id)"
     }
     catch {
         Write-VenDebugLog "Get-AzApplicationGatewaySslCertificate has failed - $($_)"
@@ -397,7 +399,7 @@ function Activate-Certificate
 
     $OldSslCert = Convert-AzResource2Hash -AzResourceId $Listener.SslCertificate.Id
     Write-VenDebugLog "Replacing SSL Certificate: $($OldSslCert['sslCertificates'])"
-    Write-VenDebugLog "\\-- $($Listener.SslCertificate.Id)"
+#    Write-VenDebugLog "\\-- $($Listener.SslCertificate.Id)"
 
     try {
         $ListenerHash = @{
@@ -447,6 +449,8 @@ function Extract-Certificate
         [System.Collections.Hashtable]$General
     )
 
+    Initialize-VenDebugLog -General $General
+
     $ListenerName = $General.VarText4.Trim()
     $AzSpPass = $General.UserPass
 
@@ -459,15 +463,13 @@ function Extract-Certificate
     $AzSpName = $AzUser[0]
     $TenantID = $AzUser[1]
     
-    Initialize-VenDebugLog -AppGW $AppGwName -Listener $ListenerName
-
     Write-VenDebugLog "Tenant ID:           [$($TenantID)]"
     Write-VenDebugLog "Subscription ID:     [$($SubscriptionID)]"
     Write-VenDebugLog "Resource Group:      [$($ResourceGroup)]"
     Write-VenDebugLog "Application Gateway: [$($AppGwName)]"
     Write-VenDebugLog "Listener Name:       [$($ListenerName)]"
-    Write-VenDebugLog "Service Principal:   [$($AzSpName)]"
-    Write-VenDebugLog "Global Debug File:   [$($DEBUG_FILE)]"
+#    Write-VenDebugLog "Service Principal:   [$($AzSpName)]"
+#    Write-VenDebugLog "Global Debug File:   [$($DEBUG_FILE)]"
 
     # connect to Azure API
     try {
@@ -482,7 +484,7 @@ function Extract-Certificate
                 else {
                     $i++
                     $wait = Get-Random -Minimum ($i+1) -Maximum ($i*3)
-                    Write-VenDebugLog "...miss on AzContext Sub:$($AzContext.Subscription) (#$($i)) - sleeping for $($wait) seconds"
+                    Write-VenDebugLog "...miss #$($i) on AzContext Sub:$($SubscriptionID) - sleeping for $($wait) seconds"
                     Start-Sleep -Seconds $wait
                 }
             }
@@ -506,7 +508,7 @@ function Extract-Certificate
     try {
         $Listener = Get-AzApplicationGatewayHttpListener -Name $ListenerName -ApplicationGateway $AppGateway -DefaultProfile $AzContext
         Write-VenDebugLog "Found Listener: $($Listener.Name)"
-        Write-VenDebugLog "\\-- $($Listener.Id)"
+#        Write-VenDebugLog "\\-- $($Listener.Id)"
     }
     catch {
         Write-VenDebugLog "Get-AzApplicationGatewayHttpListener call failed - $($_)"
@@ -515,7 +517,7 @@ function Extract-Certificate
 
     # retrieve certificate data
     Write-VenDebugLog 'Searching for SSL Certificate...'
-    Write-VenDebugLog "\\-- $($Listener.SslCertificate.Id)"
+#    Write-VenDebugLog "\\-- $($Listener.SslCertificate.Id)"
     try {
         $Cert = Get-Ven2AzCertById -CertificateId $Listener.SslCertificate.Id -ApplicationGateway $AppGateway
     }
@@ -523,9 +525,9 @@ function Extract-Certificate
         Write-VenDebugLog "SSL certificate not found for Listener $($ListenerName)"
         throw "SSL certificate not found for Listener $($ListenerName)"
     }
-    Write-VenDebugLog "Certificate Subject:       $($Cert.X509.Subject)"
-    Write-VenDebugLog "Certificate Serial Number: $($Cert.X509.SerialNumber)"
-    Write-VenDebugLog "Certificate Thumbprint:    $($Cert.X509.Thumbprint)"
+#    Write-VenDebugLog "Certificate Subject:       $($Cert.X509.Subject)"
+#    Write-VenDebugLog "Certificate Serial Number: $($Cert.X509.SerialNumber)"
+#    Write-VenDebugLog "Certificate Thumbprint:    $($Cert.X509.Thumbprint)"
 
     Write-VenDebugLog "Disconnecting from Azure API"
     Disconnect-Ven2AzGateway
@@ -548,11 +550,14 @@ function Discover-Certificates
         [System.Collections.Hashtable]$General
     )
 
-    $AzSpPass = $General.UserPass
+    $started=Get-Date
 
     if ($General.HostAddress.Trim() -notlike '/?*/?*') {
         return @{ Result = "NotUsed"; }
     }
+
+    Initialize-VenDebugLog -General $General
+
     $AzHash = Convert-AzResource2Hash $General.HostAddress.Trim()
     $SubscriptionID = $AzHash['subscriptions']
     $ResourceGroup = $AzHash['resourceGroups']
@@ -560,16 +565,14 @@ function Discover-Certificates
 
     $AzUser = $General.UserName.Trim().Split('@')
     $AzSpName = $AzUser[0]
+    $AzSpPass = $General.UserPass
     $TenantID = $AzUser[1]
-
-    Initialize-VenDebugLog -AppGW $AppGwName
 
     Write-VenDebugLog "Tenant ID:           [$($TenantID)]"
     Write-VenDebugLog "Subscription ID:     [$($SubscriptionID)]"
     Write-VenDebugLog "Resource Group:      [$($ResourceGroup)]"
     Write-VenDebugLog "Application Gateway: [$($AppGwName)]"
-    Write-VenDebugLog "Service Principal:   [$($AzSpName)]"
-    Write-VenDebugLog "Global Debug File:   [$($DEBUG_FILE)]"
+#    Write-VenDebugLog "Service Principal:   [$($AzSpName)]"
 
     # connect to Azure API
     try {
@@ -584,7 +587,7 @@ function Discover-Certificates
                 else {
                     $i++
                     $wait = Get-Random -Minimum ($i+1) -Maximum ($i*3)
-                    Write-VenDebugLog "...miss on AzContext Sub:$($AzContext.Subscription) (#$($i)) - sleeping for $($wait) seconds"
+                    Write-VenDebugLog "...miss #$($i) on AzContext Sub:$($SubscriptionID) - sleeping for $($wait) seconds"
                     Start-Sleep -Seconds $wait
                 }
             }
@@ -608,13 +611,10 @@ function Discover-Certificates
     foreach ($aListener in $AppGateway.HttpListeners) {
         if ($aListener.Protocol -eq 'Https') {
             if ($aListener.SslCertificate.Id -ne '') {
-                Write-VenDebugLog "Found Https Listener [$($aListener.Name)]"
-                Write-VenDebugLog "\\-- Cert [$($aListener.SslCertificate.Id)]"
+                Write-VenDebugLog "Discovered: Https Listener [$($aListener.Name)]"
+#                Write-VenDebugLog "\\-- Cert [$($aListener.SslCertificate.Id)]"
                 try {
                     $Cert = Get-Ven2AzCertById -CertificateId $aListener.SslCertificate.Id -ApplicationGateway $AppGateway
-                    Write-VenDebugLog "\\-- Subject $($Cert.X509.Subject)"
-                    Write-VenDebugLog "\\-- Serial Number $($Cert.X509.SerialNumber)"
-                    Write-VenDebugLog "\\-- Thumbprint $($Cert.X509.Thumbprint)"
                     # add valid listener+cert to return stack
                     $anApp = @{
                         Name = "$($aListener.Name)" # Name of the Adaptable Application object
@@ -633,12 +633,12 @@ function Discover-Certificates
                     $ApplicationList += $anApp
                 }
                 catch {
-                    Write-VenDebugLog "Listener [$($aListener.Name)] has no certificate - ignored"
+                    Write-VenDebugLog "Ignored: Listener [$($aListener.Name)] has no certificate"
                 }
             }
         }
         else {
-            Write-VenDebugLog "Listener [$($aListener.Name)] is unencrypted - ignored"
+            Write-VenDebugLog "Ignored: Listener [$($aListener.Name)] is unencrypted"
         }
     }
 
@@ -646,6 +646,10 @@ function Discover-Certificates
     Disconnect-Ven2AzGateway
 
     Write-VenDebugLog "Discovered $($ApplicationList.Count) Listeners on Application Gateway $($AppGateway.Name)"
+
+    $finished = Get-Date
+    $runtime = New-TimeSpan -Start $started -End $finished
+    Write-VenDebugLog "Scanned $($AppGateway.HttpListeners.Count) listeners (Runtime $($runtime)) - Returning control to Venafi"
 
     return @{ Result = "Success"; Applications = $ApplicationList }
 }
@@ -687,6 +691,8 @@ function Connect-Ven2Azure
         [Parameter(Mandatory=$true)][string]$SubscriptionId
     )
 
+    Write-VenDebugLog "Called by $((Get-PSCallStack)[1].Command)"
+
     Write-VenDebugLog "Disabling Azure context autosaving..."
     Clear-AzContext -Scope Process | Out-Null
     Disable-AzContextAutosave -Scope Process | Out-Null
@@ -710,6 +716,8 @@ function Connect-Ven2Azure
 
 function Disconnect-Ven2AzGateway
 {
+    Write-VenDebugLog "Called by $((Get-PSCallStack)[1].Command)"
+
     Disconnect-AzAccount
 }
 
@@ -717,13 +725,14 @@ Function Convert-Bytes2X509
 {
     Param( [Parameter(Mandatory=$true,Position=0)][string]$ByteString )
 
+    Write-VenDebugLog "Called by $((Get-PSCallStack)[1].Command)"
+
     $CertBytes = [Convert]::FromBase64String($ByteString)
     Add-Type -AssemblyName System.Security
     $P7B = New-Object System.Security.Cryptography.Pkcs.SignedCms
     $P7B.Decode($CertBytes)
 
-    Write-VenDebugLog "START: Convert-Bytes2X509"
-    Write-VenDebugLog "\\-- Certificate bundle contains $($P7B.Certificates.Count) certificates"
+    Write-VenDebugLog "Bundle contains $($P7B.Certificates.Count) certificates"
     
     $CertOrder = @()
     if ($P7B.Certificates.Count -eq 1) {
@@ -738,11 +747,12 @@ Function Convert-Bytes2X509
             $CertCN = $aCert.GetNameInfo(0,$false)
             $Issuer = $aCert.GetNameInfo(0,$true)
             if ($CertCN -eq $Issuer) {
-                Write-VenDebugLog "\\-- Selecting certificate #$($i+1) of $($P7B.Certificates.Count) as ROOT"
+                Write-VenDebugLog "Selecting certificate #$($i+1) as ROOT: $($CertCN)"
+#                Write-VenDebugLog "\\-- Selecting certificate #$($i+1) of $($P7B.Certificates.Count) as ROOT"
 #                Write-VenDebugLog "\\-- ROOT: Subject:       $($aCert.Subject)"
-                Write-VenDebugLog "\\-- ROOT: Common Name:   $($CertCN)"
-                Write-VenDebugLog "\\-- ROOT: Serial Number: $($aCert.SerialNumber)"
-                Write-VenDebugLog "\\-- ROOT: Thumbprint:    $($aCert.Thumbprint)"
+#                Write-VenDebugLog "\\-- ROOT: Common Name:   $($CertCN)"
+#                Write-VenDebugLog "\\-- ROOT: Serial Number: $($aCert.SerialNumber)"
+#                Write-VenDebugLog "\\-- ROOT: Thumbprint:    $($aCert.Thumbprint)"
                 $RootAt = $i
                 $CertOrder += $RootAt
                 break
@@ -771,17 +781,19 @@ Function Convert-Bytes2X509
                     }
                     $CertCN = $aCert.GetNameInfo(0,$false)
                     $Issuer = $aCert.GetNameInfo(0,$true)
-                    Write-VenDebugLog "\\-- Selecting certificate #$($i+1) of $($P7B.Certificates.Count) as $($CertType)"
+                    Write-VenDebugLog "Selecting certificate #$($i+1) as $($CertType): $($CertCN)"
+#                    Write-VenDebugLog "\\-- Selecting certificate #$($i+1) of $($P7B.Certificates.Count) as $($CertType)"
 #                    Write-VenDebugLog "\\-- $($CertType): Subject:       $($aCert.Subject)"
-                    Write-VenDebugLog "\\-- $($CertType): Common Name:   $($CertCN)"
-                    Write-VenDebugLog "\\-- $($CertType): Issuer:        $($Issuer)"
-                    Write-VenDebugLog "\\-- $($CertType): Serial Number: $($aCert.SerialNumber)"
-                    Write-VenDebugLog "\\-- $($CertType): Thumbprint:    $($aCert.Thumbprint)"
+#                    Write-VenDebugLog "\\-- $($CertType): Common Name:   $($CertCN)"
+#                    Write-VenDebugLog "\\-- $($CertType): Issuer:        $($Issuer)"
+#                    Write-VenDebugLog "\\-- $($CertType): Serial Number: $($aCert.SerialNumber)"
+#                    Write-VenDebugLog "\\-- $($CertType): Thumbprint:    $($aCert.Thumbprint)"
                     break    # end this foreach iteration
                 }
                 $i++
                 if ($i -ge $P7B.Certificates.Count) {
                     # that's bad... certificate we couldn't place in the chain. time to die.
+                    Write-VenDebugLog "FATAL ERROR! Could not sort certificate chain."
                     throw "Convert-Bytes2X509: Could not sort certificate chain"
                 }
             }
@@ -811,7 +823,8 @@ Function Convert-Bytes2X509
         $RootResults = $null
     }
 
-    Write-VenDebugLog "END: Convert-Bytes2X509 (Returning certificate #$($ServerAt+1))"
+    Write-VenDebugLog "Returning certificate #$($ServerAt+1) to $((Get-PSCallStack)[1].Command)"
+
     $ServerCert = $P7B.Certificates[$ServerAt]
     $RawPEM = [Convert]::ToBase64String($ServerCert.RawData,'InsertLineBreaks')
     $FormattedPem = "-----BEGIN CERTIFICATE-----`n$($RawPEM)`n-----END CERTIFICATE-----"
@@ -864,6 +877,8 @@ function Convert-AzResource2Hash
 {
     Param( [Parameter(Mandatory=$true)][string]$AzResourceId )
 
+    Write-VenDebugLog "Called by $((Get-PSCallStack)[1].Command)"
+
     $AzHash = @{}
     $Pieces = $AzResourceId.Trim('/').Split('/')
 
@@ -883,6 +898,8 @@ function Get-Ven2AzCertById
         [Parameter(Mandatory=$true)][string]$CertificateId,
         [Parameter(Mandatory=$true)]$ApplicationGateway
     )
+
+    Write-VenDebugLog "Called by $((Get-PSCallStack)[1].Command)"
 
     foreach ($aCert in $ApplicationGateway.SslCertificates) {
         if ($aCert.Id -eq $CertificateId) {
@@ -907,6 +924,8 @@ function Get-Ven2AzApplicationGateway
         [Parameter(Mandatory=$true)][string]$ResourceGroupName,
         [Parameter(Mandatory=$true)]$DefaultProfile
     )
+
+    Write-VenDebugLog "Called by $((Get-PSCallStack)[1].Command)"
 
     # How many times do we retry the application gateway search..?
     $maxRetries = 5
@@ -951,7 +970,7 @@ function Write-VenDebugLog
 
     # if the logfile isn't initialized then do nothing and return immediately
     if ($null -eq $Script:venDebugFile) { return }
-    
+
     if ($NoFunctionTag.IsPresent) {
         $taggedLog = $LogMessage
     }
@@ -966,11 +985,9 @@ function Write-VenDebugLog
 function Initialize-VenDebugLog
 {
     Param(
-        [Parameter(Mandatory)][String]$AppGW,
-        [String]$Listener='ALL'
+        [Parameter(Position=0, Mandatory)][System.Collections.Hashtable]$General
     )
 
-    # if the debugfile is already setup we shouldn't be called again - log a warning
     if ($null -ne $Script:venDebugFile) {
         Write-VenDebugLog "Called by $((Get-PSCallStack)[1].Command)"
         Write-VenDebugLog 'WARNING: Initialize-VenDebugLog() called more than once!'
@@ -980,7 +997,6 @@ function Initialize-VenDebugLog
     if ($null -eq $DEBUG_FILE) {
         # do nothing and return immediately if debug isn't on
         if ($General.VarBool1 -eq $false) { return }
-
         # pull Venafi base directory from registry for global debug flag
         $logPath = "$((Get-ItemProperty HKLM:\Software\Venafi\Platform).'Base Path')Logs"
     }
@@ -989,15 +1005,14 @@ function Initialize-VenDebugLog
         $logPath = "$(Split-Path -Path $DEBUG_FILE)"
     }
 
-    $Script:venDebugFile = "$($logPath)\$($Script:AdaptableAppDrv.Replace(' ',''))-$($AppGW)"
-    $Script:venDebugFile += ".log"
-    
-    Write-Output '' | Add-Content -Path $Script:venDebugFile
+    $AzHash = Convert-AzResource2Hash $General.HostAddress.Trim()
+    $AppGw = $AzHash['applicationGateways']
 
+    $Script:venDebugFile = "$($logPath)\$($Script:AdaptableAppDrv.Replace(' ',''))-$($AppGW).log"
+    
+    Write-Output "" | Add-Content -Path $Script:venDebugFile
     Write-VenDebugLog -NoFunctionTag -LogMessage "$($Script:AdaptableAppDrv) v$($Script:AdaptableAppVer): Venafi called $((Get-PSCallStack)[1].Command)"
     Write-VenDebugLog -NoFunctionTag -LogMessage "PowerShell Environment: $($PSVersionTable.PSEdition) Edition, Version $($PSVersionTable.PSVersion.Major)"
-
-    Write-VenDebugLog "Called by $((Get-PSCallStack)[1].Command)"
 }
 
 # END OF SCRIPT
