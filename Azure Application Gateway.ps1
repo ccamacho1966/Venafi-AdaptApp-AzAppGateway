@@ -530,7 +530,7 @@ function Extract-Certificate
 #    Write-VenDebugLog "Certificate Thumbprint:    $($Cert.X509.Thumbprint)"
 
     Write-VenDebugLog "Disconnecting from Azure API"
-    Disconnect-Ven2AzGateway
+    Disconnect-Ven2Azure
 
     Write-VenDebugLog "Certificate Extracted - Returning control to Venafi TPP"
     return @{ Result="Success"; CertPem=$Cert.PEM; Serial=$Cert.X509.SerialNumber; Thumbprint=$Cert.X509.Thumbprint }
@@ -643,7 +643,7 @@ function Discover-Certificates
     }
 
     Write-VenDebugLog "Disconnecting from Azure API"
-    Disconnect-Ven2AzGateway
+    Disconnect-Ven2Azure
 
     Write-VenDebugLog "Discovered $($ApplicationList.Count) Listeners on Application Gateway $($AppGateway.Name)"
 
@@ -714,7 +714,7 @@ function Connect-Ven2Azure
     $SpProfile
 }
 
-function Disconnect-Ven2AzGateway
+function Disconnect-Ven2Azure
 {
     Write-VenDebugLog "Called by $((Get-PSCallStack)[1].Command)"
 
@@ -948,7 +948,7 @@ function Get-Ven2AzApplicationGateway
             }
         } while ($null -eq $AppGateway)
         Write-VenDebugLog "Found Application Gateway: $($AppGateway.Name)"
-        Write-VenDebugLog "\\-- $($AppGateway.Id)"
+#        Write-VenDebugLog "\\-- $($AppGateway.Id)"
     }
     catch {
         Write-VenDebugLog "Get-AzApplicationGateway has failed - $($_)"
