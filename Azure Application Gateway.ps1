@@ -2,7 +2,7 @@
 # Azure AppGW - An Adaptable Application Driver for Venafi
 #
 # Template Driver Version: 202006081054
-$Script:AdaptableAppVer = "202205171358"
+$Script:AdaptableAppVer = "202205171720"
 $Script:AdaptableAppDrv = "Azure AppGW"
 
 <#
@@ -16,7 +16,7 @@ Adaptable Application Fields are defined one per line below in the following for
 You cannot add to, change, or remove the field names. Enable or disable as needed.
 
 -----BEGIN FIELD DEFINITIONS-----
-Text1|Azure Tenant ID|110
+Text1|Azure Tenant ID|111
 Text2|Text Field 2|000
 Text3|Text Field 3|000
 Text4|Azure Listener Name|101
@@ -62,57 +62,7 @@ Thoughts on limitations...
 # If commented out, the driver will assume this feature is not supported.
 #
 
-<#
-# REMOTE KEY GENERATION SUPPORT - COMMENTED OUT = DISABLED
-
-function Prepare-KeyStore
-{
-    Param(
-        [Parameter(Mandatory=$true,HelpMessage="General Parameters")]
-        [System.Collections.Hashtable]$General
-    )
-
-    return @{ Result="NotUsed"; }
-}
-
-function Generate-KeyPair
-{
-    Param(
-        [Parameter(Mandatory=$true,HelpMessage="General Parameters")]
-        [System.Collections.Hashtable]$General,
-        [Parameter(Mandatory=$true,HelpMessage="Function Specific Parameters")]
-        [System.Collections.Hashtable]$Specific
-    )
-
-    return @{ Result="NotUsed"; }
-}
-
-function Generate-CSR
-{
-    Param(
-        [Parameter(Mandatory=$true,HelpMessage="General Parameters")]
-        [System.Collections.Hashtable]$General,
-        [Parameter(Mandatory=$true,HelpMessage="Function Specific Parameters")]
-        [System.Collections.Hashtable]$Specific
-    )
-
-    return @{ Result="Success"; Pkcs10="-----BEGIN CERTIFICATE REQUEST-----..."; }
-}
-
-# REMOTE KEY GENERATION SUPPORT - COMMENTED OUT = DISABLED
-#>
-
-#
-# REQUIRED FUNCTIONS
-#
-# Extract-Certificate >>> must always be implemented. it is required for validation.
-#
-# Install-Certificate >>> generally required to be implemented. You can optionally
-# return "NotUsed" for this function *ONLY* if you instead implement Install-PrivateKey
-# for your driver. In most cases, you will need Install-Certificate only. The function
-# Install-Chain is also available if you need to implement certificate installation
-# using 3 different functions for the public, private, and chain certificates.
-#
+# REMOTE KEY GENERATION SUPPORT DISABLED
 
 function Install-Chain
 {
@@ -160,7 +110,6 @@ function Install-Certificate
 
     $AzUser = $General.UserName.Trim().Split('@')
     $AzSpName = $AzUser[0]
-#    $TenantID = $AzUser[1]
     $TenantID = $General.VarText1.Trim()
     $LocalHost = [Environment]::MachineName
     
@@ -169,8 +118,6 @@ function Install-Certificate
     Write-VenDebugLog "Resource Group:      [$($ResourceGroup)]"
     Write-VenDebugLog "Application Gateway: [$($AppGwName)]"
     Write-VenDebugLog "Listener Name:       [$($ListenerName)]"
-#    Write-VenDebugLog "Service Principal:   [$($AzSpName)]"
-#    Write-VenDebugLog "Global Debug File:   [$($DEBUG_FILE)]"
 
     try {
         $TempPfxFile = New-TemporaryFile
@@ -200,7 +147,6 @@ function Install-Certificate
         foreach ($Cert in $CertGroup) {
             $i++
             Write-VenDebugLog "Chain Entity #$($i): $($Cert.GetNameInfo(0,$false))"
-#            Write-VenDebugLog "Chain Entity #$($i)"
 #            Write-VenDebugLog "\\-- Subject $($Cert.Subject)"
 #            Write-VenDebugLog "\\-- Serial Number $($Cert.SerialNumber)"
 #            Write-VenDebugLog "\\-- Thumbprint $($Cert.Thumbprint)"
@@ -331,7 +277,6 @@ function Activate-Certificate
 
     $AzUser = $General.UserName.Trim().Split('@')
     $AzSpName = $AzUser[0]
-#    $TenantID = $AzUser[1]
     $TenantID = $General.VarText1.Trim()
     $LocalHost = [Environment]::MachineName
 
@@ -343,8 +288,6 @@ function Activate-Certificate
     Write-VenDebugLog "Application Gateway: [$($AppGwName)]"
     Write-VenDebugLog "Listener Name:       [$($ListenerName)]"
     Write-VenDebugLog "Certificate Name:    [$($CertName)]"
-#    Write-VenDebugLog "Service Principal:   [$($AzSpName)]"
-#    Write-VenDebugLog "Global Debug File:   [$($DEBUG_FILE)]"
 
     # connect to Azure API
     try {
@@ -464,7 +407,6 @@ function Extract-Certificate
 
     $AzUser = $General.UserName.Trim().Split('@')
     $AzSpName = $AzUser[0]
-#    $TenantID = $AzUser[1]
     $TenantID = $General.VarText1.Trim()
     
     Write-VenDebugLog "Tenant ID:           [$($TenantID)]"
@@ -472,8 +414,6 @@ function Extract-Certificate
     Write-VenDebugLog "Resource Group:      [$($ResourceGroup)]"
     Write-VenDebugLog "Application Gateway: [$($AppGwName)]"
     Write-VenDebugLog "Listener Name:       [$($ListenerName)]"
-#    Write-VenDebugLog "Service Principal:   [$($AzSpName)]"
-#    Write-VenDebugLog "Global Debug File:   [$($DEBUG_FILE)]"
 
     # connect to Azure API
     try {
@@ -569,14 +509,12 @@ function Discover-Certificates
     $AzUser = $General.UserName.Trim().Split('@')
     $AzSpName = $AzUser[0]
     $AzSpPass = $General.UserPass
-#    $TenantID = $AzUser[1]
     $TenantID = $General.VarText1.Trim()
 
     Write-VenDebugLog "Tenant ID:           [$($TenantID)]"
     Write-VenDebugLog "Subscription ID:     [$($SubscriptionID)]"
     Write-VenDebugLog "Resource Group:      [$($ResourceGroup)]"
     Write-VenDebugLog "Application Gateway: [$($AppGwName)]"
-#    Write-VenDebugLog "Service Principal:   [$($AzSpName)]"
 
     # connect to Azure API
     try {
@@ -752,9 +690,7 @@ Function Convert-Bytes2X509
             $Issuer = $aCert.GetNameInfo(0,$true)
             if ($CertCN -eq $Issuer) {
                 Write-VenDebugLog "Selecting certificate #$($i+1) as ROOT: $($CertCN)"
-#                Write-VenDebugLog "\\-- Selecting certificate #$($i+1) of $($P7B.Certificates.Count) as ROOT"
 #                Write-VenDebugLog "\\-- ROOT: Subject:       $($aCert.Subject)"
-#                Write-VenDebugLog "\\-- ROOT: Common Name:   $($CertCN)"
 #                Write-VenDebugLog "\\-- ROOT: Serial Number: $($aCert.SerialNumber)"
 #                Write-VenDebugLog "\\-- ROOT: Thumbprint:    $($aCert.Thumbprint)"
                 $RootAt = $i
@@ -786,9 +722,7 @@ Function Convert-Bytes2X509
                     $CertCN = $aCert.GetNameInfo(0,$false)
                     $Issuer = $aCert.GetNameInfo(0,$true)
                     Write-VenDebugLog "Selecting certificate #$($i+1) as $($CertType): $($CertCN)"
-#                    Write-VenDebugLog "\\-- Selecting certificate #$($i+1) of $($P7B.Certificates.Count) as $($CertType)"
 #                    Write-VenDebugLog "\\-- $($CertType): Subject:       $($aCert.Subject)"
-#                    Write-VenDebugLog "\\-- $($CertType): Common Name:   $($CertCN)"
 #                    Write-VenDebugLog "\\-- $($CertType): Issuer:        $($Issuer)"
 #                    Write-VenDebugLog "\\-- $($CertType): Serial Number: $($aCert.SerialNumber)"
 #                    Write-VenDebugLog "\\-- $($CertType): Thumbprint:    $($aCert.Thumbprint)"
@@ -842,39 +776,6 @@ Function Convert-Bytes2X509
 
     $CertResults
 }
-
-#function Convert-PEM2X509
-#{
-#    Param(
-#        [Parameter(Mandatory=$true)][string]$PemString,
-#        [switch]$Azure
-#    )
-#
-#    $PemString = $PemString.Trim()
-#    if ($Azure -eq $true) {
-#        $PemString = $PemString.Substring(60,$PemString.Length-60)
-#    }
-#    if (!$PemString.StartsWith('M') -and !$PemString.EndsWith('=')) {
-#        throw 'ABORT: Invalid PEM format!'
-#    }
-#
-#    $Cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2
-#    try {
-#        $Cert.Import([Convert]::FromBase64String($PemString))
-#    } catch {
-#        throw "Invalid certificate: ($($_))"
-#    }
-#
-#    $FormattedPem = "-----BEGIN CERTIFICATE-----`n$($PemString)`n-----END CERTIFICATE-----"
-#
-#    $PemResult = @{
-#        X509   = $Cert
-#        PEM    = $FormattedPem
-#        RawPEM = $PemString
-#    }
-#
-#    $PemResult
-#}
 
 # Converts the Azure style resource ID /tag1/value1/tag2/value2/tag3/value3 into a hash table
 function Convert-AzResource2Hash
