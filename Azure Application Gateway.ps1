@@ -2,7 +2,7 @@
 # Azure AppGW - An Adaptable Application Driver for Venafi
 #
 # Template Driver Version: 202006081054
-$Script:AdaptableAppVer = "202205161753"
+$Script:AdaptableAppVer = "202205171358"
 $Script:AdaptableAppDrv = "Azure AppGW"
 
 <#
@@ -16,7 +16,7 @@ Adaptable Application Fields are defined one per line below in the following for
 You cannot add to, change, or remove the field names. Enable or disable as needed.
 
 -----BEGIN FIELD DEFINITIONS-----
-Text1|Text Field 1|000
+Text1|Azure Tenant ID|110
 Text2|Text Field 2|000
 Text3|Text Field 3|000
 Text4|Azure Listener Name|101
@@ -48,7 +48,8 @@ Passwd|Password Field|000
 ##### info required by this application driver.
 #####
 
-##### Listener Name - REQUIRED: Maps application to Azure Listener, i.e. 'MyAGW'
+##### Azure Tenant ID   - REQUIRED: This should be paired with the credential, but...
+##### Listener Name     - REQUIRED: Maps application to Azure Listener, i.e. 'MyAGW'
 ##### Azure Resource ID - Populated by discovery as a courtesy reference
 
 Thoughts on limitations...
@@ -159,7 +160,8 @@ function Install-Certificate
 
     $AzUser = $General.UserName.Trim().Split('@')
     $AzSpName = $AzUser[0]
-    $TenantID = $AzUser[1]
+#    $TenantID = $AzUser[1]
+    $TenantID = $General.VarText1.Trim()
     $LocalHost = [Environment]::MachineName
     
     Write-VenDebugLog "Tenant ID:           [$($TenantID)]"
@@ -329,7 +331,8 @@ function Activate-Certificate
 
     $AzUser = $General.UserName.Trim().Split('@')
     $AzSpName = $AzUser[0]
-    $TenantID = $AzUser[1]
+#    $TenantID = $AzUser[1]
+    $TenantID = $General.VarText1.Trim()
     $LocalHost = [Environment]::MachineName
 
     $CertName = $General.AssetName
@@ -461,7 +464,8 @@ function Extract-Certificate
 
     $AzUser = $General.UserName.Trim().Split('@')
     $AzSpName = $AzUser[0]
-    $TenantID = $AzUser[1]
+#    $TenantID = $AzUser[1]
+    $TenantID = $General.VarText1.Trim()
     
     Write-VenDebugLog "Tenant ID:           [$($TenantID)]"
     Write-VenDebugLog "Subscription ID:     [$($SubscriptionID)]"
@@ -565,7 +569,8 @@ function Discover-Certificates
     $AzUser = $General.UserName.Trim().Split('@')
     $AzSpName = $AzUser[0]
     $AzSpPass = $General.UserPass
-    $TenantID = $AzUser[1]
+#    $TenantID = $AzUser[1]
+    $TenantID = $General.VarText1.Trim()
 
     Write-VenDebugLog "Tenant ID:           [$($TenantID)]"
     Write-VenDebugLog "Subscription ID:     [$($SubscriptionID)]"
