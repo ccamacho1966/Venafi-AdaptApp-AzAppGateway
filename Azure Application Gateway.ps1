@@ -2,7 +2,7 @@
 # Azure AppGW - An Adaptable Application Driver for Venafi
 #
 # Template Driver Version: 202006081054
-$Script:AdaptableAppVer = "202205171720"
+$Script:AdaptableAppVer = "202205241010"
 $Script:AdaptableAppDrv = "Azure AppGW"
 
 <#
@@ -365,7 +365,7 @@ function Activate-Certificate
         if ($null -ne $Listener.HostNames) {
             $ListenerHash.Add('HostNames',$Listener.HostNames)
         }
-        if ($null -ne $Listener.CustomErrorConfigurations) {
+        if (($null -ne $Listener.CustomErrorConfigurations) -and ($Listener.CustomErrorConfigurations.Count -ge 1)) {
             $ListenerHash.Add('CustomErrorConfiguration',$Listener.CustomErrorConfigurations)
         }
         $AppGateway = Set-AzApplicationGatewayHttpListener -ApplicationGateway $AppGateway @ListenerHash -DefaultProfile $AzContext
