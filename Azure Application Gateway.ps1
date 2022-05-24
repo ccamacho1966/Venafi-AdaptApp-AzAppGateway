@@ -2,7 +2,7 @@
 # Azure AppGW - An Adaptable Application Driver for Venafi
 #
 # Template Driver Version: 202006081054
-$Script:AdaptableAppVer = "202205241010"
+$Script:AdaptableAppVer = "202205241115"
 $Script:AdaptableAppDrv = "Azure AppGW"
 
 <#
@@ -362,16 +362,16 @@ function Activate-Certificate
         if ($null -ne $Listener.HostName) {
             $ListenerHash.Add('HostName',$Listener.HostName)
         }
-        if ($null -ne $Listener.HostNames) {
-            $ListenerHash.Add('HostNames',$Listener.HostNames)
-        }
         #
-        # CustomErrorConfigurations can be non-null but have 0 entries. This will be rejected by the Azure API:
+        # CustomErrorConfigurations and/or HostNames can be non-null but have 0 entries.
+        # This will be rejected by the Azure API so now we validate 1 or more entries exists.
         #
-        # Set-AzApplicationGatewayHttpListener has failed - Cannot validate argument on parameter 'CustomErrorConfiguration'.
         # The argument is null, empty, or an element of the argument collection contains a null value.
         # Supply a collection that does not contain any null values and then try the command again.
         #
+        if (($null -ne $Listener.HostNames) -and ($Listener.HostNames.Count -ge 1)) {
+            $ListenerHash.Add('HostNames',$Listener.HostNames)
+        }
         if (($null -ne $Listener.CustomErrorConfigurations) -and ($Listener.CustomErrorConfigurations.Count -ge 1)) {
             $ListenerHash.Add('CustomErrorConfiguration',$Listener.CustomErrorConfigurations)
         }
