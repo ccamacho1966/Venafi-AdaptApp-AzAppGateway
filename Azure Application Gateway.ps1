@@ -365,6 +365,13 @@ function Activate-Certificate
         if ($null -ne $Listener.HostNames) {
             $ListenerHash.Add('HostNames',$Listener.HostNames)
         }
+        #
+        # CustomErrorConfigurations can be non-null but have 0 entries. This will be rejected by the Azure API:
+        #
+        # Set-AzApplicationGatewayHttpListener has failed - Cannot validate argument on parameter 'CustomErrorConfiguration'.
+        # The argument is null, empty, or an element of the argument collection contains a null value.
+        # Supply a collection that does not contain any null values and then try the command again.
+        #
         if (($null -ne $Listener.CustomErrorConfigurations) -and ($Listener.CustomErrorConfigurations.Count -ge 1)) {
             $ListenerHash.Add('CustomErrorConfiguration',$Listener.CustomErrorConfigurations)
         }
