@@ -2,7 +2,7 @@
 # Azure AppGW - An Adaptable Application Driver for Venafi
 #
 # Template Driver Version: 202006081054
-$Script:AdaptableAppVer = "202205241115"
+$Script:AdaptableAppVer = "202207061411"
 $Script:AdaptableAppDrv = "Azure AppGW"
 
 <#
@@ -230,7 +230,7 @@ function Install-Certificate
     # save new certificate to application gateway configuration
     try {
         Write-VenDebugLog "Saving updated configuration for $($AppGwName)"
-        $AppGateway = Set-AzApplicationGateway -ApplicationGateway $AppGateway -DefaultProfile $AzContext #-Verbose *>> $Script:V2Afile
+        $AppGateway = Set-AzApplicationGateway -ApplicationGateway $AppGateway -DefaultProfile $AzContext
         if ($null -eq $AppGateway) {
             Write-VenDebugLog "Configuration update FAILED! (AGW is NULL)"
             throw "Updated AGW is NULL"
@@ -623,7 +623,76 @@ function Remove-Certificate
         [System.Collections.Hashtable]$Specific
     )
 
-    return @{ Result="NotUsed"; }
+    Initialize-VenDebugLog -General $General
+
+    $ListenerName = $General.VarText4.Trim()
+    $AzSpPass = $General.UserPass
+
+    $AzHash = Convert-AzResource2Hash $General.HostAddress.Trim()
+    $SubscriptionID = $AzHash['subscriptions']
+    $ResourceGroup = $AzHash['resourceGroups']
+    $AppGwName = $AzHash['applicationGateways']
+
+    $AzUser = $General.UserName.Trim().Split('@')
+    $AzSpName = $AzUser[0]
+    $TenantID = $General.VarText1.Trim()
+    $LocalHost = [Environment]::MachineName
+
+    $CertName = $Specific.AssetNameOld
+    
+    Write-VenDebugLog "Tenant ID:           [$($TenantID)]"
+    Write-VenDebugLog "Subscription ID:     [$($SubscriptionID)]"
+    Write-VenDebugLog "Resource Group:      [$($ResourceGroup)]"
+    Write-VenDebugLog "Application Gateway: [$($AppGwName)]"
+    Write-VenDebugLog "Listener Name:       [$($ListenerName)]"
+    Write-VenDebugLog "Certificate Name:    [$($CertName)]"
+
+    # connect to Azure API
+    try {
+        $AzProfile = Connect-Ven2Azure -AppId $AzSpName -AppPw $AzSpPass -TenantId $TenantID -SubscriptionId $SubscriptionID
+        $i=0
+        do {
+            $AzContext = Set-AzContext -Subscription $SubscriptionID -Scope Process
+            if ($null -eq $AzContext) {
+                if ($i -ge 5) {
+                    throw "AzContext is NULL"
+                }
+                else {
+                    $i++
+                    $wait = Get-Random -Minimum ($i+1) -Maximum ($i*3)
+                    Write-VenDebugLog "...miss #$($i) on AzContext Sub:$($SubscriptionID) - sleeping for $($wait) seconds"
+                    Start-Sleep -Seconds $wait
+                }
+            }
+        } while ($null -eq $AzContext)
+    }
+    catch {
+        Write-VenDebugLog "Connect-Ven2AzGateway call failed - $($_)"
+        throw $_
+    }
+
+    # retrieve application gateway
+    try {
+        $AppGateway = Get-Ven2AzApplicationGateway -Name $AppGwName -ResourceGroupName $ResourceGroup -DefaultProfile $AzContext
+    }
+    catch {
+        Write-VenDebugLog "Get-Ven2AzApplicationGateway has failed - $($_)"
+        throw $_
+    }
+
+    try {
+        $AppGateway = Remove-AzApplicationGatewaySslCertificate -Name $CertName -ApplicationGateway $AppGateway -DefaultProfile $AzContext
+    }
+    catch {
+        $fatal = "Remove-AzApplicationGatewaySslCertificate has failed on $($LocalHost) - $($_)"
+        Write-VenDebugLog $fatal
+        throw $fatal
+    }
+
+    Disconnect-Ven2Azure
+
+    Write-VenDebugLog "Certificate Removed - Returning control to Venafi TPP"
+    return @{ Result="Success"; }
 }
 
 #
