@@ -7,7 +7,7 @@
 #$Script:AdaptableTmpVer = '202309011535'
 
 # Name and version of this adaptable application
-$Script:AdaptableAppVer = '202309081720'
+$Script:AdaptableAppVer = '202309121335'
 $Script:AdaptableAppDrv = 'Azure AppGateway'
 
 # This driver requires the Az.Network module version 6.1.1 or equivalent
@@ -166,7 +166,6 @@ function Install-Certificate
         return @{ Result = 'ResumeLater' }
     }
 
-    Disconnect-AzureApi $General $AzureProfile
     Write-VenDebugLog "Certificate Installed - Returning control to Venafi"
     return @{ Result = 'Success' }
 }
@@ -295,7 +294,6 @@ function Activate-Certificate
         return @{ Result = 'ResumeLater' }
     }
 
-    Disconnect-AzureApi $General $AzureProfile
     Write-VenDebugLog "Certificate Activated - Returning control to Venafi"
     return @{ Result = 'Success' }
 }
@@ -339,8 +337,6 @@ function Extract-Certificate
         ApplicationGateway = $AppGateway
     }
     $Certificate = Get-CertificateDetails @CertificateLookup
-
-    Disconnect-AzureApi $General $AzureProfile
 
     Write-VenDebugLog "Task complete - Returning control to Venafi"
     return @{
@@ -406,7 +402,6 @@ function Remove-Certificate
         return @{ Result = 'ResumeLater' }
     }
 
-    Disconnect-AzureApi $General $AzureProfile
     Write-VenDebugLog "Removed Certificate '$($Specific.AssetNameOld)' - Returning control to Venafi"
     return @{ Result = 'Success' }
 }
@@ -463,8 +458,6 @@ function Discover-Certificates
     }
 
     Write-VenDebugLog "Discovered $($ApplicationList.Count) Listeners on Application Gateway $($AppGateway.Name)"
-
-    Disconnect-AzureApi $General $AzureProfile
 
     $runtime = New-TimeSpan -Start $started -End (Get-Date)
     Write-VenDebugLog "Scanned $($AppGateway.HttpListeners.Count) listeners (Runtime $($runtime)) - Returning control to Venafi"
@@ -706,7 +699,6 @@ function Connect-AzureApi
     $AzureContextParameters = @{
         Name           = $AzContext
         Subscription   = $Subscription
-#        Tenant         = $TenantID
         Scope          = 'Process'
         Force          = $true
         DefaultProfile = $AzProfile
@@ -736,49 +728,6 @@ function Connect-AzureApi
     } while ($true)
 
     $AzContext
-}
-
-function Disconnect-AzureApi
-{
-    Param(
-        [Parameter(Position=0, Mandatory)]
-        [System.Collections.Hashtable] $General,
-
-        [Parameter(Position=1, Mandatory)]
-        #[IAzureContextContainer]
-        $DefaultProfile
-    )
-
-    $FunctionCall = (Get-PSCallStack)[1].Command
-    Write-VenDebugLog "Called by $((Get-PSCallStack)[1].Command)"
-
-    $AzureHash     = ConvertTo-ResourceHash -AzureResourceId $General.HostAddress.Trim()
-    $Subscription  = $AzureHash.subscriptions
-    $ResourceGroup = $AzureHash.resourceGroups
-    $AppGwName     = $AzureHash.applicationGateways
-    $ListenerName  = $General.VarText4.Trim()
-    $TenantID      = $General.VarText1
-
-    # Create Azure Context name
-    $AzContext = "$([Environment]::MachineName).$($FunctionCall).$($TenantID).$($Subscription).$($ResourceGroup).$($AppGwName)"
-    if ($ListenerName) { $AzContext += ".$($ListenerName)" }
-
-    $AzureConnectionParameters = @{
-#        ApplicationId  = ($General.UserName)
-        ContextName    = $AzContext
-#        TenantId       = $TenantID
-        Scope          = 'Process'
-        DefaultProfile = $DefaultProfile
-    }
-
-    try {
-        Write-VenDebugLog "Service Principal $($General.UserName) disconnecting from Azure API"
-        Write-VenDebugLog "Context Name: $($AzContext)"
-#        Disconnect-AzAccount @AzureConnectionParameters | Out-Null
-        Write-VenDebugLog "Not disconnecting actually..."
-    } catch {
-        Write-VenDebugLog "(Ignoring) Disconnect-AzAccount has failed - $($_)"
-    }
 }
 
 # Utility functions - somewhat generic
