@@ -7,7 +7,7 @@
 #$Script:AdaptableTmpVer = '202309011535'
 
 # Name and version of this adaptable application
-$Script:AdaptableAppVer = '202309121335'
+$Script:AdaptableAppVer = '202310201031'
 $Script:AdaptableAppDrv = 'Azure AppGateway'
 
 # This driver requires the Az.Network module version 6.1.1 or equivalent
@@ -326,9 +326,13 @@ function Extract-Certificate
     }
     try {
         $Listener = Get-AzApplicationGatewayHttpListener @ListenerLookup
-        Write-VenDebugLog "Found Listener: $($Listener.Name)"
     } catch {
         "Could not retrieve listener: $($_)" | Write-VenDebugLog -ThrowException
+    }
+    if ($Listener) {
+        Write-VenDebugLog "Found Listener: $($Listener.Name)"
+    } else {
+        "Listener does not exist: $($ListenerLookup.Name)" | Write-VenDebugLog -ThrowException
     }
 
     # Retrieve certificate data
@@ -604,33 +608,6 @@ function Export-CertificateToDisk
 
     Write-VenDebugLog "PFX temporary filename: [$($TempPfxFile.FullName)]"
 
-# X509KeyStorageFlags - bitfield
-#
-#  0: The default key set is used. The user key set is usually the default.
-#  1: Private keys are stored in the current user store rather than the local computer store.
-#  2: Private keys are stored in the local computer store rather than the current user store.
-#  4: Imported keys are marked as exportable.
-#  8: User Protected - Notify the user through a dialog box or other method that the key is accessed.
-# 16: The key associated with a PFX file is persisted when importing a certificate.
-# 32: Ephemeral - The key is created in memory and not persisted on disk when importing a certificate.
-
-#    $X509StorageFlags = 32
-
-#    $CertGroup = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2Collection
-#    try {
-#        $CertGroup.Import($Specific.Pkcs12, $Specific.EncryptPass, $X509StorageFlags)
-#        $i=0
-#        foreach ($Cert in $CertGroup) {
-#            $i++
-#            Write-VenDebugLog "Chain Entity #$($i): $($Cert.GetNameInfo(0,$false))"
-#            Write-VenDebugLog "\\-- Subject $($Cert.Subject)"
-#            Write-VenDebugLog "\\-- Serial Number $($Cert.SerialNumber)"
-#            Write-VenDebugLog "\\-- Thumbprint $($Cert.Thumbprint)"
-#        }
-#    } catch {
-#        "$([Environment]::MachineName): Invalid certificate: ($($_))" | Write-VenDebugLog -ThrowException
-#    }
-
     try {
         [IO.File]::WriteAllBytes($TempPfxFile.FullName, $Specific.Pkcs12)
     } catch {
@@ -640,7 +617,7 @@ function Export-CertificateToDisk
     $TempPfxFile
 }
 
-# Connect and Disconnect from the Azure API
+# Connect to the Azure API using appropriately named contexts
 
 function Connect-AzureApi
 {
@@ -814,9 +791,7 @@ function Initialize-VenDebugLog
         $logPath = "$((Get-ItemProperty HKLM:\Software\Venafi\Platform).'Base Path')Logs"
     }
 
-    # >>> Insert customizations for parsing the hostaddress here
     $HostAddress = (($General.HostAddress.Trim()|ConvertTo-ResourceHash).applicationGateways)
-    # >>> END - hostaddress/hostname parsing
 
     $Script:venDebugFile = ("$($logPath)\$($Script:AdaptableAppDrv.Replace(' ','')) $($HostAddress)").TrimEnd() + '.log'
     Write-Output '' | Add-Content -Path $Script:venDebugFile
