@@ -105,7 +105,7 @@ function Install-Certificate
 #            Write-VenDebugLog "\\-- Subject $($CertificateCheck.X509.Subject)"
 #            Write-VenDebugLog "\\-- Serial Number $($CertificateCheck.X509.SerialNumber)"
 #            Write-VenDebugLog "\\-- Thumbprint $($CertificateCheck.X509.Thumbprint)"
-            # Consider implementing logic to validate correct cert is installed..?
+            # TODO: Implement logic to validate correct cert is actually installed
             Write-VenDebugLog "Certificate $($ExistingCertificate.Name) Already Exists - Returning control to Venafi"
             return @{ Result = 'AlreadyInstalled' }
         }
