@@ -19,7 +19,7 @@ Azure Tenant ID - x
 Azure Resource ID - x
 
 ### Device Configuration
-Hostname/Address should be configured as the Azure resource ID for the application gateway. An application gateway resource ID should look like this:
+Hostname/Address should be configured as the Azure resource ID for the application gateway. An application gateway resource ID should look like this:  
 /subscriptions/123-456-789-abc-def012345/resourceGroups/MyResourceGroup01/providers/Microsoft.Network/applicationGateways/MyAppGateway01
 
 ### Application Configuration
