@@ -14,9 +14,9 @@ The default folder location would be 'C:\Program Files\Venafi\Scripts\AdaptableA
 Pass service principal credentials to the driver as a 'Username Credential' and linked either as the 'Device Credential' or 'Application Credential'. Use the SPID as the username and the KeyValue as the password.
 
 ### Policy-Level Application Fields
-Debug This Driver (Yes/No) - Allows you to log debug info for all applications under this policy folder.
-Azure Tenant ID - x
-Azure Resource ID - x
+Debug This Driver (Yes/No) - Allows you to log debug info for all applications under this policy folder.  
+Azure Tenant ID - The Azure tenant ID can be supplied at the policy or application level.  
+Azure Resource ID - Optional field that is for informational purposes only.
 
 ### Device Configuration
 Hostname/Address should be configured as the Azure resource ID for the application gateway. An application gateway resource ID should look like this:  
