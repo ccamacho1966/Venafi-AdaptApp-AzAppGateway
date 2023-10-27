@@ -20,7 +20,7 @@ Azure Resource ID - x
 
 ### Device Configuration
 Hostname/Address should be configured as the Azure resource ID for the application gateway. An application gateway resource ID should look like this:  
-/subscriptions/123-456-789-abc-def012345/resourceGroups/MyResourceGroup01/providers/Microsoft.Network/applicationGateways/MyAppGateway01
+/subscriptions/123-456-789/resourceGroups/MyRG01/providers/Microsoft.Network/applicationGateways/MyAppGW01
 
 ### Application Configuration
 You can either run an onboard discovery to populate all existing applications or manually create each application individually. If creating applications manually, you must supply the Azure tenant ID and listener name. The Azure resource ID is optional and for informational purposes only. Discovery will populate these fields automatically.
