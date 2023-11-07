@@ -7,7 +7,7 @@
 #$Script:AdaptableTmpVer = '202309011535'
 
 # Name and version of this adaptable application
-$Script:AdaptableAppVer = '202311071709'
+$Script:AdaptableAppVer = '202311071738'
 $Script:AdaptableAppDrv = 'Azure AppGateway'
 
 # This driver requires the Az.Network module version 6.1.1 or equivalent
@@ -567,6 +567,7 @@ function New-CertificateObject
         $Current = $Last = $CertBundle.Certificates[0]
         $FormattedPem = "-----BEGIN CERTIFICATE-----`n$([Convert]::ToBase64String($Current.RawData,'InsertLineBreaks'))`n-----END CERTIFICATE-----`n"
 #        $FormattedPem = "subject=$($Current.Subject)`n$($FormattedPem)"
+        Write-VenDebugLog "Subject: $($Current.Subject)"
     } else {
         Write-VenDebugLog "Bundle contains $($CertBundle.Certificates.Count) certificates"
         $Root = $CertBundle.Certificates | Where-Object -FilterScript { $_.GetNameInfo(0,$false) -eq $_.GetNameInfo(0,$true) }
