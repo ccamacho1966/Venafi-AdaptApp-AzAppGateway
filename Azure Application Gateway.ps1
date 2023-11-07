@@ -7,7 +7,7 @@
 #$Script:AdaptableTmpVer = '202309011535'
 
 # Name and version of this adaptable application
-$Script:AdaptableAppVer = '202310201031'
+$Script:AdaptableAppVer = '202311071709'
 $Script:AdaptableAppDrv = 'Azure AppGateway'
 
 # This driver requires the Az.Network module version 6.1.1 or equivalent
@@ -558,28 +558,37 @@ function New-CertificateObject
     $CertBundle = New-Object System.Security.Cryptography.Pkcs.SignedCms
     $CertBundle.Decode([Convert]::FromBase64String($ByteString))
 
-    Write-VenDebugLog "Bundle contains $($CertBundle.Certificates.Count) certificates"
-
-    $Root = $CertBundle.Certificates | Where-Object -FilterScript { $_.GetNameInfo(0,$false) -eq $_.GetNameInfo(0,$true) }
-
-    $missed = $CertBundle.Certificates.Count
-    $Last = $Current = $Root
-    $FormattedPem = "-----BEGIN CERTIFICATE-----`n$([Convert]::ToBase64String($Current.RawData,'InsertLineBreaks'))`n-----END CERTIFICATE-----`n"
-#    $FormattedPem = "subject=$($Current.Subject)`n$($FormattedPem)"
-    Write-VenDebugLog "Root/Anchor: $($Current.Subject)"
-    do {
-        $missed--
-        $Current = $CertBundle.Certificates | Where-Object -FilterScript { $_.GetNameInfo(0,$true) -eq $Current.GetNameInfo(0,$false) -and $_.GetNameInfo(0,$true) -ne $_.GetNameInfo(0,$false) }
-        if ($Current) {
-            $Last = $Current
-            $FormattedPem = "-----BEGIN CERTIFICATE-----`n$([Convert]::ToBase64String($Current.RawData,'InsertLineBreaks'))`n-----END CERTIFICATE-----`n$($FormattedPem)"
-#            $FormattedPem = "subject=$($Current.Subject)`n$($FormattedPem)"
-            Write-VenDebugLog "Next in chain: $($Current.Subject)"
+    if ($CertBundle.Certificates.Count -eq 0) {
+        Write-VenDebugLog "No certificates found in bundle!!"
+        return
+    } elseif ($CertBundle.Certificates.Count -eq 1) {
+        Write-VenDebugLog "No chain - Bundle contains only 1 certificate"
+        $missed = 0
+        $Current = $Last = $CertBundle.Certificates[0]
+        $FormattedPem = "-----BEGIN CERTIFICATE-----`n$([Convert]::ToBase64String($Current.RawData,'InsertLineBreaks'))`n-----END CERTIFICATE-----`n"
+#        $FormattedPem = "subject=$($Current.Subject)`n$($FormattedPem)"
+    } else {
+        Write-VenDebugLog "Bundle contains $($CertBundle.Certificates.Count) certificates"
+        $Root = $CertBundle.Certificates | Where-Object -FilterScript { $_.GetNameInfo(0,$false) -eq $_.GetNameInfo(0,$true) }
+        $Last = $Current = $Root
+        $missed = $CertBundle.Certificates.Count
+        $FormattedPem = "-----BEGIN CERTIFICATE-----`n$([Convert]::ToBase64String($Current.RawData,'InsertLineBreaks'))`n-----END CERTIFICATE-----`n"
+#        $FormattedPem = "subject=$($Current.Subject)`n$($FormattedPem)"
+        Write-VenDebugLog "Root/Anchor: $($Current.Subject)"
+        do {
+            $missed--
+            $Current = $CertBundle.Certificates | Where-Object -FilterScript { $_.GetNameInfo(0,$true) -eq $Current.GetNameInfo(0,$false) -and $_.GetNameInfo(0,$true) -ne $_.GetNameInfo(0,$false) }
+            if ($Current) {
+                $Last = $Current
+                $FormattedPem = "-----BEGIN CERTIFICATE-----`n$([Convert]::ToBase64String($Current.RawData,'InsertLineBreaks'))`n-----END CERTIFICATE-----`n$($FormattedPem)"
+#                $FormattedPem = "subject=$($Current.Subject)`n$($FormattedPem)"
+                Write-VenDebugLog "Next in chain: $($Current.Subject)"
+            }
+        } while ($Current)
+    
+        if ($missed) {
+            Write-VenDebugLog "Warning: $($missed) certificates in bundle were not linked..!"
         }
-    } while ($Current)
-
-    if ($missed) {
-        Write-VenDebugLog "Warning: $($missed) certificates in bundle were not linked..!"
     }
     
     if (($CertBundle.Certificates.Count - $missed) -gt 1) { $chain = 'chain ' }
