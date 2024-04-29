@@ -7,7 +7,7 @@
 #$Script:AdaptableTmpVer = '202309011535'
 
 # Name and version of this adaptable application
-$Script:AdaptableAppVer = '202311071738'
+$Script:AdaptableAppVer = '202404261652'
 $Script:AdaptableAppDrv = 'Azure AppGateway'
 
 # This driver requires the Az.Network module version 6.1.1 or equivalent
@@ -126,7 +126,27 @@ function Install-Certificate
     }
     Write-VenDebugLog "Uploading certificate $($General.AssetName) to $($AppGateway.Name)"
     try {
-        $AppGateway = Add-AzApplicationGatewaySslCertificate @UploadCertificate
+#        $AppGateway = Add-AzApplicationGatewaySslCertificate @UploadCertificate
+        # Run the Azure update as a lightweight thread that can be forcibly timed out
+        $azJob = Start-ThreadJob -ScriptBlock { Add-AzApplicationGatewaySslCertificate @using:UploadCertificate }
+
+        # Wait up to 15 seconds for the thread to complete
+        $azResult = $azJob | Wait-Job -Timeout 15
+
+        # If the thread completed, receive the output
+        if ($azResult.State -eq 'Completed') {
+            $AppGateway = $azJob | Receive-Job
+        }
+
+        # Forcibly remove the job regardless of outcome
+        $azJob | Remove-Job -Force
+
+        # If cmdlet timed out or failed throw to the error block so we can retry later
+        if (-not $azResult) {
+            throw "Timeout exceeded"
+        } elseif ($azResult.State -ne 'Completed') {
+            throw "Job $($azResult.State)"
+        }
     } catch {
         Write-VenDebugLog "Error while uploading certificate: $($_)"
         Write-VenDebugLog "Invoking 'ResumeLater' to pause and retry later."
@@ -154,7 +174,27 @@ function Install-Certificate
     # Save updated application gateway configuration (supports -AsJob)
     try {
         Write-VenDebugLog "Saving updated configuration for $($AppGateway.Name)"
-        $AppGateway = Set-AzApplicationGateway -ApplicationGateway $AppGateway -DefaultProfile $AzureProfile
+#        $AppGateway = Set-AzApplicationGateway -ApplicationGateway $AppGateway -DefaultProfile $AzureProfile
+        # Run the Azure update as a lightweight thread that can be forcibly timed out
+        $azJob = Start-ThreadJob -ScriptBlock { Set-AzApplicationGateway -ApplicationGateway $using:AppGateway -DefaultProfile $using:AzureProfile }
+
+        # Wait up to 15 seconds for the thread to complete
+        $azResult = $azJob | Wait-Job -Timeout 15
+
+        # If the thread completed, receive the output
+        if ($azResult.State -eq 'Completed') {
+            $AppGateway = $azJob | Receive-Job
+        }
+
+        # Forcibly remove the job regardless of outcome
+        $azJob | Remove-Job -Force
+
+        # If cmdlet timed out or failed throw to the error block so we can retry later
+        if (-not $azResult) {
+            throw "Timeout exceeded"
+        } elseif ($azResult.State -ne 'Completed') {
+            throw "Job $($azResult.State)"
+        }
     } catch {
         Write-VenDebugLog "Configuration update failed on $([Environment]::MachineName). Set-AzApplicationGateway: $($_)"
         Write-VenDebugLog "Invoking 'ResumeLater' to pause and retry later."
@@ -278,7 +318,27 @@ function Activate-Certificate
     Write-VenDebugLog "Replacing SSL Certificate: $($OldCertificate)"
 
     try {
-        $AppGateway = Set-AzApplicationGatewayHttpListener @ListenerUpdate
+#        $AppGateway = Set-AzApplicationGatewayHttpListener @ListenerUpdate
+        # Run the Azure update as a lightweight thread that can be forcibly timed out
+        $azJob = Start-ThreadJob -ScriptBlock { Set-AzApplicationGatewayHttpListener @using:ListenerUpdate }
+
+        # Wait up to 15 seconds for the thread to complete
+        $azResult = $azJob | Wait-Job -Timeout 15
+
+        # If the thread completed, receive the output
+        if ($azResult.State -eq 'Completed') {
+            $AppGateway = $azJob | Receive-Job
+        }
+
+        # Forcibly remove the job regardless of outcome
+        $azJob | Remove-Job -Force
+
+        # If cmdlet timed out or failed throw to the error block so we can retry later
+        if (-not $azResult) {
+            throw "Timeout exceeded"
+        } elseif ($azResult.State -ne 'Completed') {
+            throw "Job $($azResult.State)"
+        }
     } catch {
         Write-VenDebugLog "Listener update failed - $($_)"
         Write-VenDebugLog "Invoking 'ResumeLater' to pause and retry later."
@@ -287,7 +347,27 @@ function Activate-Certificate
 
     # Save updated application gateway configuration (supports -AsJob)
     try {
-        $AppGateway = Set-AzApplicationGateway -ApplicationGateway $AppGateway -DefaultProfile $AzureProfile
+#        $AppGateway = Set-AzApplicationGateway -ApplicationGateway $AppGateway -DefaultProfile $AzureProfile
+        # Run the Azure update as a lightweight thread that can be forcibly timed out
+        $azJob = Start-ThreadJob -ScriptBlock { Set-AzApplicationGateway -ApplicationGateway $using:AppGateway -DefaultProfile $using:AzureProfile }
+
+        # Wait up to 15 seconds for the thread to complete
+        $azResult = $azJob | Wait-Job -Timeout 15
+
+        # If the thread completed, receive the output
+        if ($azResult.State -eq 'Completed') {
+            $AppGateway = $azJob | Receive-Job
+        }
+
+        # Forcibly remove the job regardless of outcome
+        $azJob | Remove-Job -Force
+
+        # If cmdlet timed out or failed throw to the error block so we can retry later
+        if (-not $azResult) {
+            throw "Timeout exceeded"
+        } elseif ($azResult.State -ne 'Completed') {
+            throw "Job $($azResult.State)"
+        }
     } catch {
         Write-VenDebugLog "Application Gateway update failed - $($_)"
         Write-VenDebugLog "Invoking 'ResumeLater' to pause and retry later."
@@ -391,7 +471,27 @@ function Remove-Certificate
         DefaultProfile     = $AzureProfile
     }
     try {
-        $AppGateway = Remove-AzApplicationGatewaySslCertificate @RemoveCertificate
+#        $AppGateway = Remove-AzApplicationGatewaySslCertificate @RemoveCertificate
+        # Run the Azure update as a lightweight thread that can be forcibly timed out
+        $azJob = Start-ThreadJob -ScriptBlock { Remove-AzApplicationGatewaySslCertificate @using:RemoveCertificate }
+
+        # Wait up to 15 seconds for the thread to complete
+        $azResult = $azJob | Wait-Job -Timeout 15
+
+        # If the thread completed, receive the output
+        if ($azResult.State -eq 'Completed') {
+            $AppGateway = $azJob | Receive-Job
+        }
+
+        # Forcibly remove the job regardless of outcome
+        $azJob | Remove-Job -Force
+
+        # If cmdlet timed out or failed throw to the error block so we can retry later
+        if (-not $azResult) {
+            throw "Timeout exceeded"
+        } elseif ($azResult.State -ne 'Completed') {
+            throw "Job $($azResult.State)"
+        }
     } catch {
         Write-VenDebugLog "Remove Certificate failed - $($_)"
         Write-VenDebugLog "Invoking 'ResumeLater' to pause and retry later."
@@ -399,7 +499,27 @@ function Remove-Certificate
     }
 
     try {
-        $AppGateway = Set-AzApplicationGateway -ApplicationGateway $AppGateway -DefaultProfile $AzureProfile
+#        $AppGateway = Set-AzApplicationGateway -ApplicationGateway $AppGateway -DefaultProfile $AzureProfile
+        # Run the Azure update as a lightweight thread that can be forcibly timed out
+        $azJob = Start-ThreadJob -ScriptBlock { Set-AzApplicationGateway -ApplicationGateway $using:AppGateway -DefaultProfile $using:AzureProfile }
+
+        # Wait up to 15 seconds for the thread to complete
+        $azResult = $azJob | Wait-Job -Timeout 15
+
+        # If the thread completed, receive the output
+        if ($azResult.State -eq 'Completed') {
+            $AppGateway = $azJob | Receive-Job
+        }
+
+        # Forcibly remove the job regardless of outcome
+        $azJob | Remove-Job -Force
+
+        # If cmdlet timed out or failed throw to the error block so we can retry later
+        if (-not $azResult) {
+            throw "Timeout exceeded"
+        } elseif ($azResult.State -ne 'Completed') {
+            throw "Job $($azResult.State)"
+        }
     } catch {
         Write-VenDebugLog "AppGateway update after remove certificate failed - $($_)"
         Write-VenDebugLog "Invoking 'ResumeLater' to pause and retry later."
@@ -627,8 +747,8 @@ function Export-CertificateToDisk
     $TempPfxFile
 }
 
-# Connect to the Azure API using appropriately named contexts
-
+# Connect to the Azure API using specific named contexts
+# Return IAzureContextContainer object if successful
 function Connect-AzureApi
 {
     Param(
@@ -645,6 +765,9 @@ function Connect-AzureApi
     $AppGwName     = $AzureHash.applicationGateways
     $ListenerName  = $General.VarText4.Trim()
     $TenantID      = $General.VarText1
+
+    # How many times do we try to connect to Azure or set the context..?
+    $maxRetries = 3
 
     # Create Azure Context name
     $AzContext = "$([Environment]::MachineName).$($FunctionCall).$($TenantID).$($Subscription).$($ResourceGroup).$($AppGwName)"
@@ -667,15 +790,30 @@ function Connect-AzureApi
 
     Enable-AzContextAutosave | Out-Null
 
-    # Connect to the Azure account - Return IAzureContextContainer object if successful
-    try {
-        Write-VenDebugLog "Azure Tenant '$($TenantID)', Subscription '$($Subscription)'"
-        Write-VenDebugLog "Connecting to Azure API as Service Principal $($General.UserName)"
-        $AzProfile = Connect-AzAccount @AzureConnectionParameters
-    } catch {
-        Write-VenDebugLog "Connect-AzAccount has failed - $($_)"
-        throw $_
-    }
+    # Connect to the Azure API using the provided service principal
+    $i=0
+    Write-VenDebugLog "Azure Tenant '$($TenantID)', Subscription '$($Subscription)'"
+    Write-VenDebugLog "Connecting to Azure API as Service Principal $($General.UserName)"
+    do {
+        $i++
+        if ($i -gt 1) {
+            $s = 's'
+            $wait = Get-Random -Minimum ($i*2) -Maximum ($i*3)
+            Write-VenDebugLog "...Sleeping for $($wait) seconds before retrying"
+            Start-Sleep -Seconds $wait
+        } else {
+            $s = ''
+        }
+        try {
+            $AzProfile = Connect-AzAccount @AzureConnectionParameters
+        } catch {
+            Write-VenDebugLog "Connect-AzAccount has failed $($i) time$($s): $($_)"
+            if ($i -gt $maxRetries) {
+                Write-VenDebugLog '...Aborting'
+                throw $_
+            }
+        }
+    } while (-not $AzProfile)
 
     $DeviceDetails = "Resource Group '$($ResourceGroup)', Application Gateway '$($AppGwName)'"
     if ($ListenerName) {
@@ -691,28 +829,29 @@ function Connect-AzureApi
         DefaultProfile = $AzProfile
     }
 
-    # How many times do we try to set the Azure context..?
-    $maxRetries = 3
-
     # Create the Azure context for this run of the driver
     Write-VenDebugLog "Creating Context: $($AzContext)"
+    $i=0
     do {
         $i++
-        if ($i -gt 1) { $s = 's' }
+        if ($i -gt 1) {
+            $s = 's'
+            $wait = Get-Random -Minimum ($i*2) -Maximum ($i*3)
+            Write-VenDebugLog "...Sleeping for $($wait) seconds before retrying"
+            Start-Sleep -Seconds $wait
+        } else {
+            $s = ''
+        }
         try {
             $AzContext = Set-AzContext @AzureContextParameters
-            break
         } catch {
             Write-VenDebugLog "Set-AzContext has failed $($i) time$($s): $($_)"
             if ($i -gt $maxRetries) {
                 Write-VenDebugLog '...Aborting'
                 throw $_
             }
-            $wait = Get-Random -Minimum ($i*2) -Maximum ($i*3)
-            Write-VenDebugLog "...Sleeping for $($wait) seconds before retrying"
-            Start-Sleep -Seconds $wait
         }
-    } while ($true)
+    } while (-not $AzContext)
 
     $AzContext
 }
