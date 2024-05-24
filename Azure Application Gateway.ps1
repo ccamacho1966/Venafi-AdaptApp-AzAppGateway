@@ -7,7 +7,7 @@
 #$Script:AdaptableTmpVer = '202309011535'
 
 # Name and version of this adaptable application
-$Script:AdaptableAppVer = '202404261652'
+$Script:AdaptableAppVer = '202405241059'
 $Script:AdaptableAppDrv = 'Azure AppGateway'
 
 # This driver requires the Az.Network module version 6.1.1 or equivalent
@@ -315,7 +315,6 @@ function Activate-Certificate
     }
 
     $OldCertificate = ($Listener.SslCertificate.Id | ConvertTo-ResourceHash).sslCertificates
-    Write-VenDebugLog "Replacing SSL Certificate: $($OldCertificate)"
 
     try {
 #        $AppGateway = Set-AzApplicationGatewayHttpListener @ListenerUpdate
@@ -327,6 +326,7 @@ function Activate-Certificate
 
         # If the thread completed, receive the output
         if ($azResult.State -eq 'Completed') {
+            Write-VenDebugLog "Replaced old SSL Certificate: $($OldCertificate)"
             $AppGateway = $azJob | Receive-Job
         }
 
