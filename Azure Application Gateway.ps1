@@ -7,7 +7,7 @@
 #$Script:AdaptableTmpVer = '202309011535'
 
 # Name and version of this adaptable application
-$Script:AdaptableAppVer = '202405241059'
+$Script:AdaptableAppVer = '202410091745'
 $Script:AdaptableAppDrv = 'Azure AppGateway'
 
 # This driver requires the Az.Network module version 6.1.1 or equivalent
@@ -83,6 +83,14 @@ function Install-Certificate
     $General | Initialize-VenDebugLog
     $AzureProfile = $General | Connect-AzureApi
 
+    $DefaultAssetName = $InstalledAssetName = $General.AssetName
+    if (($DefaultAssetName.Substring(0,2)) -eq '*.') {
+        # Filename must be modified to remove leading asterisk
+        $FQDNLength = (($DefaultAssetName.Length) - 2)
+        $InstalledAssetName = "WILDCARD.$($DefaultAssetName.Substring(2,$FQDNLength))"
+        Write-VenDebugLog "Modifying AssetName from [$($DefaultAssetName)] to [$($InstalledAssetName)]"
+    }
+
     # Retrieve configuration of the application gateway
     try {
         $AppGateway = Get-AppGateway $General $AzureProfile
@@ -95,7 +103,7 @@ function Install-Certificate
     try {
         $CertificateCheck = @{
             ApplicationGateway = $AppGateway
-            Name               = ($General.AssetName)
+            Name               = $InstalledAssetName
             DefaultProfile     = $AzureProfile
         }
         $ExistingCertificate = Get-AzApplicationGatewaySslCertificate @CertificateCheck
@@ -106,8 +114,13 @@ function Install-Certificate
 #            Write-VenDebugLog "\\-- Serial Number $($CertificateCheck.X509.SerialNumber)"
 #            Write-VenDebugLog "\\-- Thumbprint $($CertificateCheck.X509.Thumbprint)"
             # TODO: Implement logic to validate correct cert is actually installed
+            $ResultData = @{ Result = 'AlreadyInstalled' }
+            if ($DefaultAssetName -ne ($ExistingCertificate.Name)) {
+                # Existing Certificate name does not match AssetName so return new name to Venafi
+                $ResultData.AssetName = ($ExistingCertificate.Name)
+            }
             Write-VenDebugLog "Certificate $($ExistingCertificate.Name) Already Exists - Returning control to Venafi"
-            return @{ Result = 'AlreadyInstalled' }
+            return $ResultData
         }
     } catch {
         Write-VenDebugLog "Error while checking for certificate already being installed: $($_)"
@@ -119,14 +132,13 @@ function Install-Certificate
     $TempPfxFile       = $Specific | Export-CertificateToDisk
     $UploadCertificate = @{
         ApplicationGateway = $AppGateway
-        Name               = ($General.AssetName)
+        Name               = $InstalledAssetName
         CertificateFile    = ($TempPfxFile.FullName)
         Password           = (ConvertTo-SecureString $Specific.EncryptPass -AsPlainText -Force)
         DefaultProfile     = $AzureProfile
     }
-    Write-VenDebugLog "Uploading certificate $($General.AssetName) to $($AppGateway.Name)"
+    Write-VenDebugLog "Uploading certificate $($InstalledAssetName) to $($AppGateway.Name)"
     try {
-#        $AppGateway = Add-AzApplicationGatewaySslCertificate @UploadCertificate
         # Run the Azure update as a lightweight thread that can be forcibly timed out
         $azJob = Start-ThreadJob -ScriptBlock { Add-AzApplicationGatewaySslCertificate @using:UploadCertificate }
 
@@ -159,14 +171,14 @@ function Install-Certificate
     # Validate the certificate uploaded successfully
     $UploadValidation = @{
         ApplicationGateway = $AppGateway
-        Name               = ($General.AssetName)
+        Name               = $InstalledAssetName
         DefaultProfile     = $AzureProfile
     }
     $ExistingCertificate = Get-AzApplicationGatewaySslCertificate @UploadValidation
     if ($ExistingCertificate) {
-        Write-VenDebugLog "SSL certificate $($General.AssetName) has been uploaded successfully"
+        Write-VenDebugLog "SSL certificate $($InstalledAssetName) has been uploaded successfully"
     } else {
-        Write-VenDebugLog "Error validating upload of $($General.AssetName)"
+        Write-VenDebugLog "Error validating upload of $($InstalledAssetName)"
         Write-VenDebugLog "Invoking 'ResumeLater' to pause and retry later."
         return @{ Result = 'ResumeLater' }
     }
@@ -174,7 +186,6 @@ function Install-Certificate
     # Save updated application gateway configuration (supports -AsJob)
     try {
         Write-VenDebugLog "Saving updated configuration for $($AppGateway.Name)"
-#        $AppGateway = Set-AzApplicationGateway -ApplicationGateway $AppGateway -DefaultProfile $AzureProfile
         # Run the Azure update as a lightweight thread that can be forcibly timed out
         $azJob = Start-ThreadJob -ScriptBlock { Set-AzApplicationGateway -ApplicationGateway $using:AppGateway -DefaultProfile $using:AzureProfile }
 
@@ -206,8 +217,13 @@ function Install-Certificate
         return @{ Result = 'ResumeLater' }
     }
 
+    $ResultData = @{ Result = 'Success' }
+    if ($DefaultAssetName -ne $InstalledAssetName) {
+        # AssetName got overridden so return new name to Venafi
+        $ResultData.AssetName = $InstalledAssetName
+    }
     Write-VenDebugLog "Certificate Installed - Returning control to Venafi"
-    return @{ Result = 'Success' }
+    return $ResultData
 }
 
 # Stage 803: OPTIONAL FUNCTION
