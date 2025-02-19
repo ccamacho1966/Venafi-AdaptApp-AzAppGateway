@@ -7,7 +7,7 @@
 #$Script:AdaptableTmpVer = '202309011535'
 
 # Name and version of this adaptable application
-$Script:AdaptableAppVer = '202410091745'
+$Script:AdaptableAppVer = '202502191637'
 $Script:AdaptableAppDrv = 'Azure AppGateway'
 
 # This driver requires the Az.Network module version 6.1.1 or equivalent
@@ -187,7 +187,11 @@ function Install-Certificate
     try {
         Write-VenDebugLog "Saving updated configuration for $($AppGateway.Name)"
         # Run the Azure update as a lightweight thread that can be forcibly timed out
-        $azJob = Start-ThreadJob -ScriptBlock { Set-AzApplicationGateway -ApplicationGateway $using:AppGateway -DefaultProfile $using:AzureProfile }
+        [string]$ThreadError = $null
+        $azJob = Start-ThreadJob -ScriptBlock {
+            $ThreadError = $using:ThreadError
+            Set-AzApplicationGateway -ApplicationGateway $using:AppGateway -DefaultProfile $using:AzureProfile -ErrorVariable ThreadError
+        }
 
         # Wait up to 15 seconds for the thread to complete
         $azResult = $azJob | Wait-Job -Timeout 15
@@ -203,6 +207,8 @@ function Install-Certificate
         # If cmdlet timed out or failed throw to the error block so we can retry later
         if (-not $azResult) {
             throw "Timeout exceeded"
+        } elseif ($ThreadError) {
+            throw "Error Caught: $($ThreadError)"
         } elseif ($azResult.State -ne 'Completed') {
             throw "Job $($azResult.State)"
         }
