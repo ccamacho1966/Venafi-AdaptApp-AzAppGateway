@@ -7,7 +7,7 @@
 #$Script:AdaptableTmpVer = '202309011535'
 
 # Name and version of this adaptable application
-$Script:AdaptableAppVer = '202505281733'
+$Script:AdaptableAppVer = '202505281813'
 $Script:AdaptableAppDrv = 'Azure AppGateway'
 
 # This driver requires the Az.Network module version 6.1.1 or equivalent
@@ -347,7 +347,6 @@ function Activate-Certificate
 
         if ($azResult) {
             Write-VenDebugLog "Listener Update Job Status: $($azResult.State)"
-            Write-VenDebugLog "DEBUG: $($azResult|ConvertTo-Json -Depth 5 -Compress)"
             if ($azResult.State -eq 'Completed') {
                 # Thread completed - receive the output
                 $AppGateway = $azJob | Receive-Job
@@ -387,7 +386,6 @@ function Activate-Certificate
 
         if ($azResult) {
             Write-VenDebugLog "AppGateway Update Job Status: $($azResult.State)"
-            Write-VenDebugLog "DEBUG: $($azResult|ConvertTo-Json -Depth 5 -Compress)"
             if ($azResult.State -eq 'Completed') {
                 # Thread completed - receive the output
                 $AppGateway = $azJob | Receive-Job
