@@ -7,7 +7,7 @@
 #$Script:AdaptableTmpVer = '202309011535'
 
 # Name and version of this adaptable application
-$Script:AdaptableAppVer = '202502191637'
+$Script:AdaptableAppVer = '202505281733'
 $Script:AdaptableAppDrv = 'Azure AppGateway'
 
 # This driver requires the Az.Network module version 6.1.1 or equivalent
@@ -339,59 +339,78 @@ function Activate-Certificate
     $OldCertificate = ($Listener.SslCertificate.Id | ConvertTo-ResourceHash).sslCertificates
 
     try {
-#        $AppGateway = Set-AzApplicationGatewayHttpListener @ListenerUpdate
         # Run the Azure update as a lightweight thread that can be forcibly timed out
         $azJob = Start-ThreadJob -ScriptBlock { Set-AzApplicationGatewayHttpListener @using:ListenerUpdate }
 
         # Wait up to 15 seconds for the thread to complete
         $azResult = $azJob | Wait-Job -Timeout 15
 
-        # If the thread completed, receive the output
-        if ($azResult.State -eq 'Completed') {
-            Write-VenDebugLog "Replaced old SSL Certificate: $($OldCertificate)"
-            $AppGateway = $azJob | Receive-Job
-        }
+        if ($azResult) {
+            Write-VenDebugLog "Listener Update Job Status: $($azResult.State)"
+            Write-VenDebugLog "DEBUG: $($azResult|ConvertTo-Json -Depth 5 -Compress)"
+            if ($azResult.State -eq 'Completed') {
+                # Thread completed - receive the output
+                $AppGateway = $azJob | Receive-Job
 
-        # Forcibly remove the job regardless of outcome
-        $azJob | Remove-Job -Force
+                # Forcibly remove the job
+                $azJob | Remove-Job -Force
 
-        # If cmdlet timed out or failed throw to the error block so we can retry later
-        if (-not $azResult) {
+                if ($AppGateway) {
+                    Write-VenDebugLog "Replaced old SSL Certificate: $($OldCertificate)"
+                } else {
+                    throw "AppGateway is NULL"
+                }
+            } else {
+                # cmdlet failed - throw to the error block so we can retry later
+                throw "Job State is $($azResult.State)"
+            }
+        } else {
+            # cmdlet timed out - throw to the error block so we can retry later
             throw "Timeout exceeded"
-        } elseif ($azResult.State -ne 'Completed') {
-            throw "Job $($azResult.State)"
         }
     } catch {
-        Write-VenDebugLog "Listener update failed - $($_)"
+        # Forcibly remove the job
+        $azJob | Remove-Job -Force
+
+        Write-VenDebugLog "Listener Update failed - $($_)"
         Write-VenDebugLog "Invoking 'ResumeLater' to pause and retry later."
         return @{ Result = 'ResumeLater' }
     }
 
     # Save updated application gateway configuration (supports -AsJob)
     try {
-#        $AppGateway = Set-AzApplicationGateway -ApplicationGateway $AppGateway -DefaultProfile $AzureProfile
         # Run the Azure update as a lightweight thread that can be forcibly timed out
         $azJob = Start-ThreadJob -ScriptBlock { Set-AzApplicationGateway -ApplicationGateway $using:AppGateway -DefaultProfile $using:AzureProfile }
 
         # Wait up to 15 seconds for the thread to complete
         $azResult = $azJob | Wait-Job -Timeout 15
 
-        # If the thread completed, receive the output
-        if ($azResult.State -eq 'Completed') {
-            $AppGateway = $azJob | Receive-Job
-        }
+        if ($azResult) {
+            Write-VenDebugLog "AppGateway Update Job Status: $($azResult.State)"
+            Write-VenDebugLog "DEBUG: $($azResult|ConvertTo-Json -Depth 5 -Compress)"
+            if ($azResult.State -eq 'Completed') {
+                # Thread completed - receive the output
+                $AppGateway = $azJob | Receive-Job
 
-        # Forcibly remove the job regardless of outcome
-        $azJob | Remove-Job -Force
+                # Forcibly remove the job
+                $azJob | Remove-Job -Force
 
-        # If cmdlet timed out or failed throw to the error block so we can retry later
-        if (-not $azResult) {
+                if (-not $AppGateway) {
+                    throw "AppGateway is NULL"
+                }
+            } else {
+                # cmdlet failed - throw to the error block so we can retry later
+                throw "Job State is $($azResult.State)"
+            }
+        } else {
+            # cmdlet timed out - throw to the error block so we can retry later
             throw "Timeout exceeded"
-        } elseif ($azResult.State -ne 'Completed') {
-            throw "Job $($azResult.State)"
         }
     } catch {
-        Write-VenDebugLog "Application Gateway update failed - $($_)"
+        # Forcibly remove the job
+        $azJob | Remove-Job -Force
+
+        Write-VenDebugLog "AppGateway Update failed - $($_)"
         Write-VenDebugLog "Invoking 'ResumeLater' to pause and retry later."
         return @{ Result = 'ResumeLater' }
     }
