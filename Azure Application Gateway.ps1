@@ -7,7 +7,7 @@
 #$Script:AdaptableTmpVer = '202309011535'
 
 # Name and version of this adaptable application
-$Script:AdaptableAppVer = '202505281813'
+$Script:AdaptableAppVer = '202506021205'
 $Script:AdaptableAppDrv = 'Azure AppGateway'
 
 # This driver requires the Az.Network module version 6.1.1 or equivalent
@@ -394,7 +394,28 @@ function Activate-Certificate
                 $azJob | Remove-Job -Force
 
                 if (-not $AppGateway) {
-                    throw "AppGateway is NULL"
+                    # Try to recover from Set-AzApplicationGateway NULL result
+                    Write-VenDebugLog "Attempt to Resume: AppGateway is NULL - Retrieving AppGateway"
+                    try {
+                        $AppGateway = Get-AppGateway $General $AzureProfile
+                    } catch {
+                        Write-VenDebugLog "Recovery attempt FAILED (AppGateway): $($_)"
+                        throw "AppGateway is NULL"
+                    }
+                    Write-VenDebugLog "Attempt to Resume: AppGateway Retrieved - Retrieving Listener"
+                    try {
+                        $Listener = Get-AzApplicationGatewayHttpListener @ListenerLookup
+                    } catch {
+                        Write-VenDebugLog "Recovery attempt FAILED (Listener): $($_)"
+                        throw "AppGateway is NULL"
+                    }
+                    $ActiveCertificate = ($Listener.SslCertificate.Id | ConvertTo-ResourceHash).sslCertificates
+                    if ($ActiveCertificate -eq ($General.AssetName)) {
+                        Write-VenDebugLog "Recovery attempt SUCCESS: $($ActiveCertificate) has been activated!"
+                    } else {
+                        Write-VenDebugLog "Recovery attempt FAILED (Certificate): Active certificate is $($ActiveCertificate)"
+                        throw "AppGateway is NULL"
+                    }
                 }
             } else {
                 # cmdlet failed - throw to the error block so we can retry later
